@@ -15,7 +15,10 @@ public interface PayoutRepository extends JpaRepository<Payout, UUID> {
 
     List<Payout> findByRiderIdAndStatusIn(UUID riderId, Collection<PayoutStatus> statuses);
 
-    List<Payout> findByStatusAndNextAttemptAtLessThanEqual(PayoutStatus status, Instant cutoff);
+    /** Oldest first, so payouts that waited longest are served first when funds arrive. */
+    List<Payout> findByStatusInAndNextAttemptAtLessThanEqualOrderByCreatedAtAsc(Collection<PayoutStatus> statuses, Instant cutoff);
+
+    List<Payout> findByStatusOrderByCreatedAtAsc(PayoutStatus status);
 
     Page<Payout> findByStatus(PayoutStatus status, Pageable pageable);
 }

@@ -21,9 +21,11 @@ class AdminPaymentController {
     private final PaymentService paymentService;
     private final PayoutRepository payouts;
     private final LedgerService ledger;
+    private final PayoutService payoutService;
 
     AdminPaymentController(PaymentRepository payments, PaymentService paymentService, PayoutRepository payouts,
-                           LedgerService ledger) {
+                           LedgerService ledger, PayoutService payoutService) {
+        this.payoutService = payoutService;
         this.payments = payments;
         this.paymentService = paymentService;
         this.payouts = payouts;
@@ -45,10 +47,10 @@ class AdminPaymentController {
     }
 
     record PayoutView(UUID id, UUID riderId, BigDecimal amount, PayoutStatus status, int attempts, String failureReason,
-                      Instant createdAt) {
+                      Instant waitingSince, Instant createdAt) {
         static PayoutView of(Payout p) {
             return new PayoutView(p.getId(), p.getRiderId(), p.getAmount(), p.getStatus(), p.getAttempts(),
-                    p.getFailureReason(), p.getCreatedAt());
+                    p.getFailureReason(), p.getWaitingSince(), p.getCreatedAt());
         }
     }
 
@@ -74,6 +76,12 @@ class AdminPaymentController {
                                  @RequestParam(defaultValue = "0") int page, @RequestParam(defaultValue = "20") int size) {
         var paging = PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), 100), Sort.by(Sort.Direction.DESC, "createdAt"));
         return PageView.of(status == null ? payouts.findAll(paging) : payouts.findByStatus(status, paging), PayoutView::of);
+    }
+
+    /** Settled money at the provider versus what riders are waiting to be paid: tells ops if funds are running short. */
+    @GetMapping("/payouts/funding")
+    PayoutService.Funding funding() {
+        return payoutService.funding();
     }
 
     /** Total debits must equal total credits; anything else means the books are corrupt. */

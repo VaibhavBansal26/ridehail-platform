@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.ridehail.customer.CustomerRepository;
 import com.ridehail.payment.PaymentService;
+import com.ridehail.payment.PayoutService;
 import com.ridehail.rider.RiderRepository;
 import com.stripe.exception.SignatureVerificationException;
 import com.stripe.model.Event;
@@ -14,8 +15,10 @@ import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.scheduling.TaskScheduler;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -29,6 +32,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  *   setup_intent.succeeded     the customer saved a card            -> store the card as their payment method
  *   account.updated            rider onboarding progressed          -> payouts enabled/disabled on their account
  *   payment_intent.succeeded   a charge completed (maybe late)      -> confirm our payment (idempotent)
+ *   balance.available          settled funds arrived at the platform -> retry payouts that were waiting for funds
  *   charge.dispute.created, refund.failed, payout.failed, transfer.reversed
  *                              money problems we do not automate    -> logged at ERROR for a human to act on
  */
@@ -50,17 +54,22 @@ public class StripeWebhookService {
     private final CustomerRepository customers;
     private final RiderRepository riders;
     private final PaymentService payments;
+    private final PayoutService payouts;
+    private final TaskScheduler scheduler;
     private final TransactionTemplate tx;
     private final ObjectMapper json;
     private final Clock clock;
 
     StripeWebhookService(StripeProperties props, ProcessedWebhookEventRepository processed, CustomerRepository customers,
-                         RiderRepository riders, PaymentService payments, TransactionTemplate tx, ObjectMapper json, Clock clock) {
+                         RiderRepository riders, PaymentService payments, PayoutService payouts,
+                         @Qualifier("taskScheduler") TaskScheduler scheduler, TransactionTemplate tx, ObjectMapper json, Clock clock) {
         this.props = props;
         this.processed = processed;
         this.customers = customers;
         this.riders = riders;
         this.payments = payments;
+        this.payouts = payouts;
+        this.scheduler = scheduler;
         this.tx = tx;
         this.json = json;
         this.clock = clock;
@@ -98,6 +107,7 @@ public class StripeWebhookService {
             case "setup_intent.succeeded" -> { onCardSaved(object); yield true; }
             case "account.updated" -> { onAccountUpdated(object); yield true; }
             case "payment_intent.succeeded" -> { onPaymentSucceeded(object); yield true; }
+            case "balance.available" -> { onFundsAvailable(); yield true; }
             default -> {
                 if (NEEDS_A_HUMAN.contains(type)) {
                     log.error("Stripe event {} ({}) needs manual follow-up: {}", type, eventId, object.path("id").asText());
@@ -132,6 +142,20 @@ public class StripeWebhookService {
                 // a rider can only be paid once Stripe says the account can receive funds
                 r -> r.setPayoutAccountToken(payoutsEnabled ? accountId : null),
                 () -> log.warn("account.updated for unknown connected account {}", accountId)));
+    }
+
+    /**
+     * Retrying payouts calls Stripe once per waiting payout, so do it in the background and answer the webhook now.
+     * If this is lost (crash), the scheduled poll picks the payouts up anyway.
+     */
+    private void onFundsAvailable() {
+        scheduler.schedule(() -> {
+            try {
+                payouts.onFundsAvailable();
+            } catch (RuntimeException e) {
+                log.warn("Retrying payouts after balance.available failed; the scheduled poll will cover it", e);
+            }
+        }, Instant.now());
     }
 
     private void onPaymentSucceeded(JsonNode intent) {

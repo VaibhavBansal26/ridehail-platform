@@ -2,6 +2,7 @@ package com.ridehail.payment;
 
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Optional;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
@@ -27,6 +28,8 @@ public class FakePaymentGateway implements PaymentGateway, OnboardingGateway {
     private final Map<String, GatewayResult> resultsByKey = new ConcurrentHashMap<>();
     private final List<String> requests = new CopyOnWriteArrayList<>();
     private final AtomicInteger transientFailuresLeft = new AtomicInteger();
+    private final AtomicInteger fundsRefusalsLeft = new AtomicInteger();
+    private volatile BigDecimal availableBalance; // null = unlimited, like a provider that does not report a balance
 
     @Override
     public GatewayResult charge(String key, String token, BigDecimal amount, String currency) {
@@ -41,11 +44,23 @@ public class FakePaymentGateway implements PaymentGateway, OnboardingGateway {
 
     @Override
     public GatewayResult payout(String key, String destination, BigDecimal amount, String currency) {
-        return handle("payout", key, () -> destination == null || destination.startsWith("dest_decline")
-                ? GatewayResult.declined("Destination rejected") : GatewayResult.ok("po_" + key));
+        return handle("payout", key, () -> {
+            BigDecimal funds = availableBalance;
+            if (fundsRefusalsLeft.getAndUpdate(n -> n > 0 ? n - 1 : 0) > 0 || (funds != null && amount.compareTo(funds) > 0)) {
+                return GatewayResult.awaitingFunds("Insufficient available balance"); // not remembered, like a real refusal
+            }
+            if (destination == null || destination.startsWith("dest_decline")) return GatewayResult.declined("Destination rejected");
+            if (funds != null) availableBalance = funds.subtract(amount); // the money has left
+            return GatewayResult.ok("po_" + key);
+        });
     }
 
-    private GatewayResult handle(String op, String key, java.util.function.Supplier<GatewayResult> decide) {
+    @Override
+    public Optional<BigDecimal> availableBalance(String currency) {
+        return Optional.ofNullable(availableBalance);
+    }
+
+    private synchronized GatewayResult handle(String op, String key, java.util.function.Supplier<GatewayResult> decide) {
         requests.add(op + ":" + key);
         GatewayResult remembered = resultsByKey.get(op + ":" + key);
         if (remembered != null) return remembered; // idempotent replay
@@ -53,7 +68,7 @@ public class FakePaymentGateway implements PaymentGateway, OnboardingGateway {
             return GatewayResult.transientError("Provider timeout"); // not remembered: the retry is a fresh attempt
         }
         GatewayResult result = decide.get();
-        resultsByKey.put(op + ":" + key, result);
+        if (result.outcome() != GatewayResult.Outcome.AWAITING_FUNDS) resultsByKey.put(op + ":" + key, result);
         return result;
     }
 
@@ -77,10 +92,18 @@ public class FakePaymentGateway implements PaymentGateway, OnboardingGateway {
 
     public void failNextCallsTransiently(int n) { transientFailuresLeft.set(n); }
 
+    /** Pretend the platform's available balance is this much (null = unlimited). Payouts above it are refused. */
+    public void setAvailableBalance(BigDecimal balance) { availableBalance = balance; }
+
+    /** The next n payouts are refused for lack of funds even if the balance looked fine (a race with the provider). */
+    public void refuseNextPayoutsForFunds(int n) { fundsRefusalsLeft.set(n); }
+
     public void reset() {
         resultsByKey.clear();
         requests.clear();
         transientFailuresLeft.set(0);
+        fundsRefusalsLeft.set(0);
+        availableBalance = null;
     }
 
     /** Every request received, including replays: "charge:<key>", "payout:<key>", ... */

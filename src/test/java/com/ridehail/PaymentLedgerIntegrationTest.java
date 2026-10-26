@@ -111,13 +111,13 @@ class PaymentLedgerIntegrationTest extends ApiTestBase {
         Ride ride = completeRide(customer("Ravi"), rider);
         awaitPayment(ride.tripId(), p -> p.getAttempts() == 1);
 
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < 10; i++) {
             clock.advance(Duration.ofMinutes(30));
             paymentService.retryDue();
         }
 
         Payment p = awaitStatus(ride.tripId(), PaymentStatus.REQUIRES_ATTENTION);
-        assertThat(p.getAttempts()).isEqualTo(5);
+        assertThat(p.getAttempts()).isEqualTo(8);
         assertThat(riderBalance(rider)).isEqualByComparingTo("0");
         assertThat(cash()).isEqualByComparingTo("0");
     }
@@ -292,7 +292,7 @@ class PaymentLedgerIntegrationTest extends ApiTestBase {
 
         gateway.failNextCallsTransiently(100);
         call(HttpMethod.POST, "/api/riders/me/payouts", rider, null).andExpect(status().isCreated());
-        for (int i = 0; i < 6; i++) {
+        for (int i = 0; i < 10; i++) {
             clock.advance(Duration.ofMinutes(30));
             payoutService.retryDue();
         }
@@ -301,6 +301,184 @@ class PaymentLedgerIntegrationTest extends ApiTestBase {
         // the provider may or may not have paid, so the money must not flow back to the rider
         assertThat(riderBalance(rider)).isEqualByComparingTo("0");
         assertThat(balance(AccountType.PAYOUTS_IN_TRANSIT)).isEqualByComparingTo(p.getRiderAmount());
+    }
+
+    // ---------- payouts that have to wait for the provider's funds ----------
+
+    @Test
+    void aPayoutWaitsForSettledProviderFundsInsteadOfBeingAttemptedAndRefused() throws Exception {
+        Actor rider = onlineRider("Asha", 0.005);
+        Payment p = awaitStatus(completeRide(customer("Ravi"), rider).tripId(), PaymentStatus.CAPTURED);
+        setPayoutAccount(rider, "dest_ok");
+        gateway.setAvailableBalance(BigDecimal.ZERO);          // the card money is still pending at the provider
+
+        JsonNode payout = body(call(HttpMethod.POST, "/api/riders/me/payouts", rider, null).andExpect(status().isCreated()));
+
+        assertThat(payout.get("status").asText()).isEqualTo("AWAITING_FUNDS");
+        assertThat(payout.get("waitingSince").isNull()).isFalse();
+        assertThat(gateway.requests().stream().filter(r -> r.startsWith("payout:"))).isEmpty();   // nothing was even sent
+        assertThat(payoutRepo.findAll().get(0).getAttempts()).isZero();                             // and no error retry was used
+        // the money is parked, not lost and not spendable twice
+        assertThat(riderBalance(rider)).isEqualByComparingTo("0");
+        assertThat(balance(AccountType.PAYOUTS_IN_TRANSIT)).isEqualByComparingTo(p.getRiderAmount());
+        assertThat(fetch("/api/riders/me/earnings", rider).get("payoutsInProgress").decimalValue()).isEqualByComparingTo(p.getRiderAmount());
+        call(HttpMethod.POST, "/api/riders/me/payouts", rider, null).andExpect(status().isConflict());
+
+        // polling before the poll interval does nothing; at the interval it looks again and keeps waiting
+        clock.advance(Duration.ofMinutes(10));
+        payoutService.retryDue();
+        assertThat(payoutRepo.findAll().get(0).getNextAttemptAt()).isAfter(java.time.Instant.now(clock));
+        clock.advance(Duration.ofMinutes(6));
+        payoutService.retryDue();
+        assertThat(payoutRepo.findAll().get(0).getStatus()).isEqualTo(PayoutStatus.AWAITING_FUNDS);
+
+        // the funds settle: it goes out at the next look
+        gateway.setAvailableBalance(new BigDecimal("100.00"));
+        clock.advance(Duration.ofMinutes(16));
+        payoutService.retryDue();
+
+        Payout done = payoutRepo.findAll().get(0);
+        assertThat(done.getStatus()).isEqualTo(PayoutStatus.PAID);
+        assertThat(done.getAttempts()).isEqualTo(1);
+        assertThat(balance(AccountType.PAYOUTS_IN_TRANSIT)).isEqualByComparingTo("0");
+        assertThat(cash()).isEqualByComparingTo(p.getCommissionAmount());
+        assertThat(ledger.trialBalance().balanced()).isTrue();
+    }
+
+    @Test
+    void aPayoutKeepsWaitingForDaysNotMinutes() throws Exception {
+        Actor rider = onlineRider("Asha", 0.005);
+        Payment p = awaitStatus(completeRide(customer("Ravi"), rider).tripId(), PaymentStatus.CAPTURED);
+        setPayoutAccount(rider, "dest_ok");
+        gateway.setAvailableBalance(BigDecimal.ZERO);
+        call(HttpMethod.POST, "/api/riders/me/payouts", rider, null).andExpect(status().isCreated());
+
+        for (int hour = 0; hour < 48; hour++) {                  // two days of polling
+            clock.advance(Duration.ofHours(1));
+            payoutService.retryDue();
+        }
+
+        Payout waiting = payoutRepo.findAll().get(0);
+        assertThat(waiting.getStatus()).isEqualTo(PayoutStatus.AWAITING_FUNDS);   // the old behaviour parked it after ~8 minutes
+        assertThat(waiting.getAttempts()).isZero();
+        assertThat(balance(AccountType.PAYOUTS_IN_TRANSIT)).isEqualByComparingTo(p.getRiderAmount());
+
+        gateway.setAvailableBalance(new BigDecimal("50.00"));
+        clock.advance(Duration.ofHours(1));
+        payoutService.retryDue();
+        assertThat(payoutRepo.findAll().get(0).getStatus()).isEqualTo(PayoutStatus.PAID);
+    }
+
+    @Test
+    void ifTheProviderRefusesForLackOfFundsDespiteAGoodBalanceReadItJustWaits() throws Exception {
+        Actor rider = onlineRider("Asha", 0.005);
+        awaitStatus(completeRide(customer("Ravi"), rider).tripId(), PaymentStatus.CAPTURED);
+        setPayoutAccount(rider, "dest_ok");
+        gateway.refuseNextPayoutsForFunds(1);                   // another payout took the money between our check and the transfer
+
+        JsonNode payout = body(call(HttpMethod.POST, "/api/riders/me/payouts", rider, null).andExpect(status().isCreated()));
+        assertThat(payout.get("status").asText()).isEqualTo("AWAITING_FUNDS");
+        assertThat(payoutRepo.findAll().get(0).getAttempts()).isZero();   // a refusal for funds is not a failed attempt
+
+        clock.advance(Duration.ofMinutes(16));
+        payoutService.retryDue();
+        assertThat(payoutRepo.findAll().get(0).getStatus()).isEqualTo(PayoutStatus.PAID);
+        assertThat(gateway.succeeded("payout")).isEqualTo(1);
+    }
+
+    @Test
+    void waitingPayoutsAreServedOldestFirstAsFundsArrive() throws Exception {
+        Actor first = onlineRider("First", 0.005);
+        Payment p1 = awaitStatus(completeRide(customer("C1"), first).tripId(), PaymentStatus.CAPTURED);
+        Actor second = onlineRider("Second", 0.001);              // closer, so it gets the next ride
+        Payment p2 = awaitStatus(completeRide(customer("C2"), second).tripId(), PaymentStatus.CAPTURED);
+        setPayoutAccount(first, "dest_ok");
+        setPayoutAccount(second, "dest_ok");
+        gateway.setAvailableBalance(BigDecimal.ZERO);
+
+        call(HttpMethod.POST, "/api/riders/me/payouts", first, null).andExpect(status().isCreated());
+        clock.advance(Duration.ofSeconds(5));
+        call(HttpMethod.POST, "/api/riders/me/payouts", second, null).andExpect(status().isCreated());
+
+        gateway.setAvailableBalance(p1.getRiderAmount().add(new BigDecimal("0.01")));   // enough for exactly one
+        clock.advance(Duration.ofMinutes(16));
+        payoutService.retryDue();
+
+        assertThat(payoutFor(first).getStatus()).isEqualTo(PayoutStatus.PAID);               // waited longest
+        assertThat(payoutFor(second).getStatus()).isEqualTo(PayoutStatus.AWAITING_FUNDS);
+
+        gateway.setAvailableBalance(p2.getRiderAmount());
+        clock.advance(Duration.ofMinutes(16));
+        payoutService.retryDue();
+        assertThat(payoutFor(second).getStatus()).isEqualTo(PayoutStatus.PAID);
+        assertThat(ledger.trialBalance().balanced()).isTrue();
+    }
+
+    @Test
+    void whenFundsNeverComeAndNothingWasEverSentTheMoneyGoesSafelyBackToTheRider() throws Exception {
+        Actor rider = onlineRider("Asha", 0.005);
+        Payment p = awaitStatus(completeRide(customer("Ravi"), rider).tripId(), PaymentStatus.CAPTURED);
+        setPayoutAccount(rider, "dest_ok");
+        gateway.setAvailableBalance(BigDecimal.ZERO);
+        call(HttpMethod.POST, "/api/riders/me/payouts", rider, null).andExpect(status().isCreated());
+
+        for (int day = 0; day < 12; day++) {                      // the waiting limit is 10 days
+            clock.advance(Duration.ofDays(1));
+            payoutService.retryDue();
+        }
+
+        Payout gaveUp = payoutRepo.findAll().get(0);
+        assertThat(gaveUp.getStatus()).isEqualTo(PayoutStatus.FAILED);
+        assertThat(gaveUp.getFailureReason()).contains("returned to your balance");
+        assertThat(gateway.requests().stream().filter(r -> r.startsWith("payout:"))).isEmpty();   // so giving the money back is safe
+        assertThat(riderBalance(rider)).isEqualByComparingTo(p.getRiderAmount());
+        assertThat(balance(AccountType.PAYOUTS_IN_TRANSIT)).isEqualByComparingTo("0");
+        assertThat(cash()).isEqualByComparingTo(p.getAmount());
+        assertThat(ledger.trialBalance().balanced()).isTrue();
+
+        // and the rider can ask again once there is money
+        gateway.setAvailableBalance(new BigDecimal("100.00"));
+        call(HttpMethod.POST, "/api/riders/me/payouts", rider, null).andExpect(status().isCreated());
+        assertThat(gateway.succeeded("payout")).isEqualTo(1);
+    }
+
+    @Test
+    void whenAnEarlierCallHadAnUnknownOutcomeTheMoneyStaysReservedEvenAfterTheWaitingLimit() throws Exception {
+        Actor rider = onlineRider("Asha", 0.005);
+        Payment p = awaitStatus(completeRide(customer("Ravi"), rider).tripId(), PaymentStatus.CAPTURED);
+        setPayoutAccount(rider, "dest_ok");
+        gateway.failNextCallsTransiently(1);                      // a timeout: did the transfer go out or not? unknown
+        call(HttpMethod.POST, "/api/riders/me/payouts", rider, null).andExpect(status().isCreated());
+        assertThat(payoutRepo.findAll().get(0).getAttempts()).isEqualTo(1);
+
+        gateway.setAvailableBalance(BigDecimal.ZERO);
+        clock.advance(Duration.ofSeconds(31));
+        payoutService.retryDue();
+        assertThat(payoutRepo.findAll().get(0).getStatus()).isEqualTo(PayoutStatus.AWAITING_FUNDS);
+        for (int day = 0; day < 12; day++) {
+            clock.advance(Duration.ofDays(1));
+            payoutService.retryDue();
+        }
+
+        assertThat(payoutRepo.findAll().get(0).getStatus()).isEqualTo(PayoutStatus.REQUIRES_ATTENTION);
+        assertThat(riderBalance(rider)).isEqualByComparingTo("0");                                   // NOT returned: it may have been sent
+        assertThat(balance(AccountType.PAYOUTS_IN_TRANSIT)).isEqualByComparingTo(p.getRiderAmount());
+    }
+
+    @Test
+    void opsCanSeeSettledFundsAgainstWhatRidersAreWaitingFor() throws Exception {
+        Actor rider = onlineRider("Asha", 0.005);
+        Payment p = awaitStatus(completeRide(customer("Ravi"), rider).tripId(), PaymentStatus.CAPTURED);
+        setPayoutAccount(rider, "dest_ok");
+        gateway.setAvailableBalance(new BigDecimal("3.00"));
+        call(HttpMethod.POST, "/api/riders/me/payouts", rider, null).andExpect(status().isCreated());
+
+        JsonNode funding = fetch("/api/admin/payouts/funding", admin());
+        assertThat(funding.get("providerAvailable").decimalValue()).isEqualByComparingTo("3.00");
+        assertThat(funding.get("awaitingTotal").decimalValue()).isEqualByComparingTo(p.getRiderAmount());
+        assertThat(funding.get("awaitingCount").asInt()).isEqualTo(1);
+        call(HttpMethod.GET, "/api/admin/payouts/funding", rider, null).andExpect(status().isForbidden());
+        assertThat(fetch("/api/admin/payouts?status=AWAITING_FUNDS", admin()).get("total").asInt()).isEqualTo(1);
     }
 
     // ---------- ledger invariants ----------
@@ -368,6 +546,10 @@ class PaymentLedgerIntegrationTest extends ApiTestBase {
     }
 
     // ---------- helpers ----------
+
+    private Payout payoutFor(Actor rider) {
+        return payoutRepo.findTop20ByRiderIdOrderByCreatedAtDesc(rider.id()).get(0);
+    }
 
     private BigDecimal cash() { return balance(AccountType.CASH); }
 

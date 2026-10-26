@@ -2,6 +2,7 @@ package com.ridehail.payment.stripe;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static com.ridehail.payment.GatewayResult.Outcome.AWAITING_FUNDS;
 import static com.ridehail.payment.GatewayResult.Outcome.DECLINED;
 import static com.ridehail.payment.GatewayResult.Outcome.SUCCEEDED;
 import static com.ridehail.payment.GatewayResult.Outcome.TRANSIENT_ERROR;
@@ -190,8 +191,32 @@ class StripeGatewayTest {
 
     @Test
     void payoutWaitsWhenThePlatformBalanceIsNotYetAvailable() {
+        // "not yet" is its own outcome: it is not an error and must not use up error retries
         stub.reply(TRANSFER, 400, StubStripe.error("invalid_request_error", "balance_insufficient", "Insufficient funds"));
-        assertThat(gateway.payout("k", "acct_77", new BigDecimal("7.99"), "USD").outcome()).isEqualTo(TRANSIENT_ERROR);
+        assertThat(gateway.payout("k", "acct_77", new BigDecimal("7.99"), "USD").outcome()).isEqualTo(AWAITING_FUNDS);
+    }
+
+    @Test
+    void availableBalanceIsTheSettledMoneyInThePlatformCurrencyOnly() {
+        stub.reply("GET /v1/balance", 200, balance("[{\"amount\":2550,\"currency\":\"usd\"},{\"amount\":9900,\"currency\":\"eur\"}]",
+                "[{\"amount\":50000,\"currency\":\"usd\"}]"));
+        assertThat(gateway.availableBalance("USD")).hasValue(new BigDecimal("25.50"));  // not the 500.00 still pending
+        assertThat(gateway.availableBalance("eur")).hasValue(new BigDecimal("99.00"));
+
+        stub.reply("GET /v1/balance", 200, balance("[]", "[{\"amount\":999,\"currency\":\"usd\"}]"));
+        assertThat(gateway.availableBalance("USD")).hasValue(new BigDecimal("0.00"));    // everything is still pending
+    }
+
+    @Test
+    void ifTheBalanceCannotBeReadWeSayUnknownAndLetTheTransferDecide() {
+        stub.reply("GET /v1/balance", 500, StubStripe.error("api_error", null, "boom"));
+        assertThat(gateway.availableBalance("USD")).isEmpty();
+        stub.reply("GET /v1/balance", 401, StubStripe.error("authentication_error", null, "Invalid API Key"));
+        assertThat(gateway.availableBalance("USD")).isEmpty();
+    }
+
+    static String balance(String available, String pending) {
+        return "{\"object\":\"balance\",\"livemode\":false,\"available\":" + available + ",\"pending\":" + pending + "}";
     }
 
     @Test
@@ -268,6 +293,8 @@ class StripeGatewayTest {
         assertThat(StripeMoney.toMinorUnits(new BigDecimal("10.99"), "USD")).isEqualTo(1099);
         assertThat(StripeMoney.toMinorUnits(new BigDecimal("0.05"), "usd")).isEqualTo(5);
         assertThat(StripeMoney.toMinorUnits(new BigDecimal("500"), "JPY")).isEqualTo(500);   // yen has no minor unit
+        assertThat(StripeMoney.fromMinorUnits(1099, "USD")).isEqualByComparingTo("10.99");
+        assertThat(StripeMoney.fromMinorUnits(500, "JPY")).isEqualByComparingTo("500");
         assertThatThrownBy(() -> StripeMoney.toMinorUnits(new BigDecimal("1.005"), "USD"))
                 .isInstanceOf(ArithmeticException.class);                                      // never round money silently
     }

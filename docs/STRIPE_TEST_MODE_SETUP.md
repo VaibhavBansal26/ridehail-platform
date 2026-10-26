@@ -29,10 +29,12 @@ name below differs slightly, search for the term in italics.
 
   | Endpoint | *Events from* | Events to subscribe |
   |---|---|---|
-  | **A: your account** | **Your account** | `setup_intent.succeeded`, `payment_intent.succeeded`, `charge.dispute.created`, `refund.failed`*, `transfer.reversed` |
+  | **A: your account** | **Your account** | `setup_intent.succeeded`, `payment_intent.succeeded`, `balance.available`, `charge.dispute.created`, `refund.failed`*, `transfer.reversed` |
   | **B: Connect** | **Connected accounts** | `account.updated`, `payout.failed` |
 
   \* If `refund.failed` is not in the event list, skip it; refunds still work, you just lose one alert.
+  `balance.available` is how a payout that is waiting for card funds to settle gets released the moment Stripe has the money;
+  without it the payout is still released, just at the next poll (every 15 minutes by default).
   Set the endpoints' **API version** to the same one the SDK uses (the Dashboard shows the choices; pick the newest),
   then copy each endpoint's **Signing secret** (`whsec_…`). **Both** go into `STRIPE_WEBHOOK_SECRET`, comma-separated (section 2).
 
@@ -280,7 +282,7 @@ json() { curl -sS -H 'Content-Type: application/json' "$@"; }   # prints the res
   - *Dashboard → Connect → Transfers*: a transfer to the rider's account for that amount.
   - *Connect → Accounts → (the account)*: the funds appear in its balance and are paid to the test bank on its schedule.
   - Run the earnings call again: `available` is `0`, and `recent` now includes a `PAYOUT_RESERVE` entry.
-  - If you get `"status": "PENDING"` instead, see "Why this card" below.
+  - If you get `"status": "AWAITING_FUNDS"` instead, Stripe has not settled the money yet; see H3 and "Why this card" below.
 
 ### Phase G: refund
 
@@ -312,12 +314,21 @@ same rider.
   The payment stays `PENDING` (not `REQUIRES_ATTENTION`, because it isn't the customer's fault) and the log shows
   `Stripe rejected our API key`. Restart with the right key and wait for the retry job (or about 30 seconds of backoff to elapse);
   it captures with the same idempotency key, so there is no double charge. *Dashboard → Developers → Logs* shows the 401s.
-- [ ] **H3. Payout before funds are available** (the known limitation):
-  1. Save a customer's card with `pm_card_visa` (4242…) instead of `pm_card_bypassPending`.
-  2. Complete a trip, then request a payout. The first transfer is refused with `balance_insufficient`: the payout
-     is `PENDING`, the rider's money is parked "in transit" (earnings show `payoutsInProgress`), and a second request returns `409`.
-  3. After 5 attempts (about 8 minutes) it becomes `REQUIRES_ATTENTION` and stays reserved. This is deliberate (the outcome
-     is unknown, so we don't hand the money back), but it shows why real deployments need the follow-up under "Known gaps".
+- [ ] **H3. Payout before funds are available** (the payout *waits*; it does not fail):
+  1. Save a customer's card with `pm_card_visa` (4242…) instead of `pm_card_bypassPending`, so the charge lands in
+     Stripe's **pending** balance.
+  2. Complete a trip, then request a payout. Expect `201` with `"status": "AWAITING_FUNDS"` and a `waitingSince` time.
+     The app read your Stripe balance, saw nothing settled, and **did not attempt the transfer** (check *Dashboard → Connect →
+     Transfers*: nothing there). The rider's money is parked "in transit" (earnings show `payoutsInProgress`), and a second request returns `409`.
+  3. See the picture ops sees: `json $API/api/admin/payouts/funding -H "$(auth $ADMIN)" | jq .`: `providerAvailable` (settled money
+     at Stripe) against `awaitingTotal` (what riders are waiting for).
+  4. It looks again every 15 minutes and **does not use up error retries**; it stays `AWAITING_FUNDS` for up to 10 days, not 8 minutes.
+     To see it release without waiting days, add settled funds from a second customer using the `pm_card_bypassPending` card and
+     run a trip. The waiting payout goes to `PAID` at the next 15-minute look at the latest; if Stripe also sends `balance.available`
+     (watch `stripe listen`; I have not confirmed it fires for this test card) it is released within seconds.
+  5. If funds never arrive: after 10 days, because nothing was ever sent, the money **returns to the rider's balance** and the
+     payout shows `FAILED` ("returned to your balance"). If an earlier call had timed out (outcome unknown) it instead becomes
+     `REQUIRES_ATTENTION` and stays reserved for a person, because a transfer might have gone out.
 - [ ] **H4. Webhook redelivery is harmless:** in the Dashboard, *Developers → Webhooks → (endpoint) → an event → Resend*
   (deployed endpoints only). The app answers `200` with `DUPLICATE` and changes nothing.
 - [ ] **H5. Authentication-required card** (`4000002760003184`): this card always needs the customer's 3-D Secure
@@ -352,7 +363,8 @@ You're done when A1–A3, B1, C1–C4, D1–D4, E1–E4, F1, G1 all behaved as s
 | `403` on `PUT /payment-method` or `PUT /payout-account` | Expected in Stripe mode: these dev shortcuts are disabled so clients cannot attach someone else's card or bank. Use the setup/onboarding flows. |
 | Payment stuck `PENDING`, log says `Stripe rejected our API key` | Fix `STRIPE_API_KEY`; it will retry by itself. |
 | Payment `REQUIRES_ATTENTION`, reason `Card declined: …` | The customer's card failed. After they save another card, retry from the admin endpoint (H1 step 5). |
-| Payout `PENDING` then `REQUIRES_ATTENTION` | Platform balance isn't available yet (H3), or Stripe rejected the transfer; look at the payout's `failureReason` in `GET /api/admin/payouts`. |
+| Payout stays `AWAITING_FUNDS` | Normal while card payments are still pending at Stripe (H3); compare `GET /api/admin/payouts/funding`. It releases itself when funds settle. Long-running: check you subscribed `balance.available`, and that the card payments are really succeeding. |
+| Payout `REQUIRES_ATTENTION` | Stripe errored or timed out repeatedly (8 attempts over about an hour), so the outcome is unknown: check *Dashboard → Connect → Transfers* for the payout's id in the metadata `ridehail_key`, then resolve by hand. Its `failureReason` says why. |
 | App fails at start: `webhook-secret are required` | `STRIPE_API_KEY` or `STRIPE_WEBHOOK_SECRET` isn't set in that shell. |
 | `409` "Phone number already registered" | The local database persists in `data/`. Use new phone numbers, or delete `data/` and restart. |
 
@@ -375,9 +387,13 @@ You're done when A1–A3, B1, C1–C4, D1–D4, E1–E4, F1, G1 all behaved as s
 
 ## 7. Known gaps (what this checklist will *not* prove)
 
-- **Payout timing.** Live charges are unavailable for a few days; a payout requested sooner is refused for lack of
-  available balance, retried for about 8 minutes, then parked for a person. Fix by gating withdrawals on available balance
-  or lengthening the retry window.
+- **Funds can be late, and payouts wait for them.** A payout waits (`AWAITING_FUNDS`) until Stripe shows enough *settled*
+  platform balance, looking every 15 minutes and on `balance.available`, oldest first, for up to 10 days
+  (`ridehail.payments.funds-poll-seconds`, `funds-max-wait-days`). It does not reserve funds for the oldest waiting payout: a
+  smaller, newer payout can go ahead of a large one if the balance only covers the small one. An alternative design that avoids
+  waiting altogether is to tie each transfer to a specific charge (Stripe's `source_transaction`), at the cost of paying out per trip.
+- **Provider errors retry for about an hour**, with a doubling delay from 30 seconds capped at 30 minutes, for at most 8 attempts
+  (`max-attempts`, `retry-backoff-seconds`, `retry-backoff-max-seconds`). A longer outage still lands in `REQUIRES_ATTENTION`.
 - **Riders in another country** from the platform need Stripe's "recipient" service agreement on their accounts; the adapter
   doesn't set it, so riders must be in the platform's country.
 - **Refunds don't claw back from the rider's Stripe account** (no transfer reversal), only in our ledger.

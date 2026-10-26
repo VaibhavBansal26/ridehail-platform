@@ -59,8 +59,11 @@ ridehail:
     gateway: fake   # fake | stripe
     commission-rate: 0.20
     min-payout: 5.00
-    max-attempts: 5           # transient gateway failures before a human has to look
-    retry-backoff-seconds: 30 # doubles on each attempt
+    max-attempts: 8             # genuine provider errors (timeouts, outages) before a human has to look
+    retry-backoff-seconds: 30   # first retry delay; doubles each time ...
+    retry-backoff-max-seconds: 1800   # ... up to this cap (so 8 attempts span about an hour)
+    funds-poll-seconds: 900     # payout waiting for settled platform funds: look again this often (no attempt used)
+    funds-max-wait-days: 10     # ... and give up waiting after this long (card funds normally clear in 2-7 days)
     lease-seconds: 120        # how long an in-flight attempt blocks other workers
     retry-scan-ms: 5000
   dispatch:

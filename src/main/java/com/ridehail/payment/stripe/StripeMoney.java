@@ -8,6 +8,11 @@ import java.util.Currency;
 final class StripeMoney {
     private StripeMoney() {}
 
+    static BigDecimal fromMinorUnits(long minor, String currencyCode) {
+        int digits = Math.max(Currency.getInstance(currencyCode.toUpperCase()).getDefaultFractionDigits(), 0);
+        return BigDecimal.valueOf(minor, digits);
+    }
+
     static long toMinorUnits(BigDecimal amount, String currencyCode) {
         int digits = Math.max(Currency.getInstance(currencyCode.toUpperCase()).getDefaultFractionDigits(), 0);
         // UNNECESSARY: refuse to silently round money; a fractional minor unit is a bug upstream

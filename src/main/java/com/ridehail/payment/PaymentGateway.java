@@ -1,6 +1,7 @@
 package com.ridehail.payment;
 
 import java.math.BigDecimal;
+import java.util.Optional;
 
 /**
  * Port to the payment provider (Stripe, Razorpay, Adyen...). Contract for implementations:
@@ -14,4 +15,13 @@ public interface PaymentGateway {
     GatewayResult refund(String idempotencyKey, String chargeReference, BigDecimal amount);
 
     GatewayResult payout(String idempotencyKey, String destinationToken, BigDecimal amount, String currency);
+
+    /**
+     * Money the platform can send out right now (settled, not merely pending), or empty if the provider cannot say.
+     * Advisory: it lets payouts wait cheaply instead of being attempted and refused. The provider's own check on
+     * {@link #payout} remains the final word.
+     */
+    default Optional<BigDecimal> availableBalance(String currency) {
+        return Optional.empty();
+    }
 }

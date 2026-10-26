@@ -14,6 +14,7 @@ import com.stripe.exception.InvalidRequestException;
 import com.stripe.exception.PermissionException;
 import com.stripe.exception.RateLimitException;
 import com.stripe.exception.StripeException;
+import com.stripe.model.Balance;
 import com.stripe.model.PaymentIntent;
 import com.stripe.net.RequestOptions;
 import com.stripe.param.AccountCreateParams;
@@ -25,6 +26,7 @@ import com.stripe.param.SetupIntentCreateParams;
 import com.stripe.param.TransferCreateParams;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 import org.slf4j.Logger;
@@ -152,6 +154,23 @@ public class StripeGateway implements PaymentGateway, OnboardingGateway {
         }
     }
 
+    /**
+     * Settled funds in the platform's Stripe balance. Card payments sit in "pending" for a few days first, and transfers
+     * can only spend "available". If Stripe cannot be asked we answer "unknown" and the transfer itself decides.
+     */
+    @Override
+    public Optional<BigDecimal> availableBalance(String currency) {
+        try {
+            long minor = stripe.balance().retrieve().getAvailable().stream()
+                    .filter(a -> currency.equalsIgnoreCase(a.getCurrency()))
+                    .mapToLong(Balance.Available::getAmount).sum();
+            return Optional.of(StripeMoney.fromMinorUnits(minor, currency));
+        } catch (StripeException e) {
+            log.warn("Could not read the Stripe balance ({}); the transfer will decide", e.getClass().getSimpleName());
+            return Optional.empty();
+        }
+    }
+
     // ---------------------------------------------------------------- onboarding
 
     @Override
@@ -217,8 +236,8 @@ public class StripeGateway implements PaymentGateway, OnboardingGateway {
         String code = e.getCode();
         String detail = code != null ? code : e.getClass().getSimpleName();
 
-        // The platform balance has no available funds yet (new charges settle after a delay): retry later.
-        if ("balance_insufficient".equals(code)) return GatewayResult.transientError("Platform balance not yet available");
+        // The platform balance has no available funds yet (new charges settle after a delay): wait, this is not an error.
+        if ("balance_insufficient".equals(code)) return GatewayResult.awaitingFunds("Platform balance not yet available");
 
         if (e instanceof CardException card) {
             if (code != null && RETRYABLE_CARD_CODES.contains(code)) return GatewayResult.transientError(detail);

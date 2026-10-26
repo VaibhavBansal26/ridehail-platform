@@ -6,7 +6,7 @@ A ride-sharing platform. This repository holds the Spring Boot 3 (Java 21) backe
 - **Dispatch:** nearest-rider offers with timeouts; the rider accepts or declines.
 - **Auth:** JWT with `CUSTOMER`, `RIDER`, `ADMIN` roles.
 - **Realtime:** STOMP WebSocket push for offers and trip updates (`/ws`).
-- **Payments:** charge on trip completion, double-entry ledger, commission, rider payouts, refunds.
+- **Payments:** charge on trip completion, double-entry ledger, commission, rider payouts (which wait for the provider's settled funds), refunds.
 - **Stripe:** charges, refunds, Connect payouts and signed webhooks behind a `PaymentGateway` port (simulated gateway for dev/tests).
 
 ## Run
@@ -40,6 +40,6 @@ See [docs/STRIPE_TEST_MODE_SETUP.md](docs/STRIPE_TEST_MODE_SETUP.md) for the tes
 
 ## Before production
 
-A payout-timing policy for Stripe's pending balance and everything under "Known gaps" in the Stripe doc.
+Everything under "Known gaps" in the Stripe doc.
 The `prod` profile requires `JWT_SECRET`, `ADMIN_PASSWORD`, `ALLOWED_ORIGINS`, DB settings and the Stripe variables,
 runs the Flyway migrations at startup, and refuses to start with the simulated gateway.

@@ -42,7 +42,7 @@ class PostgresSchemaTest {
     @Test
     void flywayAppliedBothMigrations() {
         assertThat(jdbc.queryForList("select version from flyway_schema_history where success order by installed_rank", String.class))
-                .containsExactly("1", "2");
+                .containsExactly("1", "2", "3");
     }
 
     @Test
@@ -105,8 +105,18 @@ class PostgresSchemaTest {
         UUID rider = UUID.randomUUID();
         insertPayout(rider, "PENDING");
         assertThatThrownBy(() -> insertPayout(rider, "REQUIRES_ATTENTION")).hasMessageContaining("uq_payouts_one_open_per_rider");
+        assertThatThrownBy(() -> insertPayout(rider, "AWAITING_FUNDS")).hasMessageContaining("uq_payouts_one_open_per_rider");
         insertPayout(rider, "PAID");     // finished payouts do not count
         insertPayout(rider, "PAID");
+        jdbc.update("delete from payouts where rider_id = ?", rider);
+    }
+
+    @Test
+    void aWaitingPayoutIsAnOpenPayoutAndTheStatusIsAccepted() {
+        UUID rider = UUID.randomUUID();
+        insertPayout(rider, "AWAITING_FUNDS");
+        assertThatThrownBy(() -> insertPayout(rider, "PENDING")).hasMessageContaining("uq_payouts_one_open_per_rider");
+        assertThatThrownBy(() -> insertPayout(UUID.randomUUID(), "WAITING")).hasMessageContaining("payouts_status_check");
         jdbc.update("delete from payouts where rider_id = ?", rider);
     }
 

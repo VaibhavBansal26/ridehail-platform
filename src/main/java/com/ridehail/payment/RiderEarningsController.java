@@ -54,10 +54,10 @@ class RiderEarningsController {
     record OnboardingResponse(String url, Instant expiresAt) {}
     record PayoutRequest(@DecimalMin("0.01") @Digits(integer = 10, fraction = 2) BigDecimal amount) {}
     record PayoutView(UUID id, BigDecimal amount, String currency, PayoutStatus status, String failureReason,
-                      Instant createdAt, Instant completedAt) {
+                      Instant waitingSince, Instant createdAt, Instant completedAt) {
         static PayoutView of(Payout p) {
             return new PayoutView(p.getId(), p.getAmount(), p.getCurrency(), p.getStatus(), p.getFailureReason(),
-                    p.getCreatedAt(), p.getCompletedAt());
+                    p.getWaitingSince(), p.getCreatedAt(), p.getCompletedAt());
         }
     }
     record LedgerLine(Instant at, Direction direction, BigDecimal amount, TxKind kind, String description) {}
@@ -96,7 +96,7 @@ class RiderEarningsController {
         UUID id = CurrentUser.profileId(jwt);
         var rider = riders.findById(id).orElseThrow(() -> new NotFoundException("Rider", id));
         var account = ledger.riderAccount(id);
-        BigDecimal inProgress = payouts.findByRiderIdAndStatusIn(id, EnumSet.of(PayoutStatus.PENDING, PayoutStatus.REQUIRES_ATTENTION))
+        BigDecimal inProgress = payouts.findByRiderIdAndStatusIn(id, EnumSet.of(PayoutStatus.PENDING, PayoutStatus.AWAITING_FUNDS, PayoutStatus.REQUIRES_ATTENTION))
                 .stream().map(Payout::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
         var recent = ledger.recent(account).stream()
                 .map(e -> new LedgerLine(e.at(), e.direction(), e.amount(), e.kind(), e.description())).toList();

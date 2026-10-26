@@ -9,5 +9,8 @@ public record PaymentProperties(
         BigDecimal minPayout,
         int maxAttempts,
         long retryBackoffSeconds,
+        long retryBackoffMaxSeconds,
+        long fundsPollSeconds,
+        long fundsMaxWaitDays,
         long leaseSeconds,
         long retryScanMs) {}

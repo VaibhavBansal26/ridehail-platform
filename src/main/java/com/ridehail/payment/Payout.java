@@ -21,10 +21,14 @@ public class Payout {
     @Column(precision = 12, scale = 2) private BigDecimal amount;
     private String currency;
     @Enumerated(EnumType.STRING) private PayoutStatus status = PayoutStatus.PENDING;
+    /** Provider calls that counted: succeeded, were declined, or failed with an error. Waiting for funds does not count. */
     private int attempts;
     private Instant nextAttemptAt;
     private String gatewayReference;
+    /** Why it is not PAID (yet): the last error, or the reason it is waiting. */
     private String failureReason;
+    /** When it first started waiting for provider funds; the deadline is measured from here. */
+    private Instant waitingSince;
     private Instant createdAt;
     private Instant completedAt;
 
@@ -37,17 +41,27 @@ public class Payout {
     }
 
     boolean isDue(Instant now) {
-        return status == PayoutStatus.PENDING && !now.isBefore(nextAttemptAt);
+        return isUnfinished() && !now.isBefore(nextAttemptAt);
     }
 
-    void startAttempt(Instant now, long leaseSeconds) {
-        attempts++;
+    boolean isUnfinished() {
+        return status == PayoutStatus.PENDING || status == PayoutStatus.AWAITING_FUNDS;
+    }
+
+    /** Blocks other workers from picking this up while one is working on it. */
+    void lease(Instant now, long leaseSeconds) {
         nextAttemptAt = now.plusSeconds(leaseSeconds);
+    }
+
+    void attempted() {
+        attempts++;
     }
 
     void paid(String reference, Instant now) {
         status = PayoutStatus.PAID;
         gatewayReference = reference;
+        failureReason = null;
+        waitingSince = null;
         completedAt = now;
     }
 
@@ -58,8 +72,21 @@ public class Payout {
     }
 
     void retryAt(Instant when, String reason) {
+        status = PayoutStatus.PENDING;
         nextAttemptAt = when;
         failureReason = reason;
+    }
+
+    void awaitFunds(Instant now, Instant nextLook, String reason) {
+        status = PayoutStatus.AWAITING_FUNDS;
+        if (waitingSince == null) waitingSince = now;
+        nextAttemptAt = nextLook;
+        failureReason = reason;
+    }
+
+    /** Provider says funds arrived: look again right away. */
+    void wake(Instant now) {
+        if (status == PayoutStatus.AWAITING_FUNDS) nextAttemptAt = now;
     }
 
     void requireAttention(String reason) {

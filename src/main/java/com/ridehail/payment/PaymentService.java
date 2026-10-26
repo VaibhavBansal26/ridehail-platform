@@ -168,12 +168,13 @@ public class PaymentService {
                 p.requireAttention(result.message());
                 events.publishEvent(new RideEvent(Type.PAYMENT_FAILED, p.getTripId(), p.getCustomerId(), p.getRiderId(), null));
             }
-            case TRANSIENT_ERROR -> {
+            // AWAITING_FUNDS only ever comes from payouts; if a charge somehow reports it, treat it as a retryable error
+            case TRANSIENT_ERROR, AWAITING_FUNDS -> {
                 if (p.getAttempts() >= props.maxAttempts()) {
                     p.requireAttention("Gave up after " + p.getAttempts() + " attempts: " + result.message());
                     events.publishEvent(new RideEvent(Type.PAYMENT_FAILED, p.getTripId(), p.getCustomerId(), p.getRiderId(), null));
                 } else {
-                    long delay = props.retryBackoffSeconds() * (1L << (p.getAttempts() - 1));
+                    long delay = Backoff.seconds(p.getAttempts(), props.retryBackoffSeconds(), props.retryBackoffMaxSeconds());
                     p.retryAt(now.plusSeconds(delay), result.message());
                 }
             }

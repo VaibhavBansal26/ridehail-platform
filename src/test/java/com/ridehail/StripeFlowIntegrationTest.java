@@ -11,6 +11,7 @@ import com.ridehail.ledger.AccountType;
 import com.ridehail.ledger.LedgerService;
 import com.ridehail.payment.Payment;
 import com.ridehail.payment.PaymentStatus;
+import com.ridehail.payment.PayoutService;
 import com.ridehail.payment.PayoutStatus;
 import com.ridehail.payment.stripe.StubStripe;
 import java.math.BigDecimal;
@@ -61,6 +62,7 @@ class StripeFlowIntegrationTest extends ApiTestBase {
     static void stopStub() { stub.stop(); }
 
     @Autowired LedgerService ledger;
+    @Autowired PayoutService payoutService;
 
     @BeforeEach
     void resetStripe() {
@@ -258,6 +260,78 @@ class StripeFlowIntegrationTest extends ApiTestBase {
         call(HttpMethod.POST, "/api/trips", customer, "{\"quoteId\":\"" + quoteId + "\"}").andExpect(status().isConflict());
     }
 
+    // ---------------------------------------------------------------- payouts waiting for Stripe funds
+
+    @Test
+    void aPayoutWaitsForSettledStripeFundsAndTheBalanceAvailableWebhookReleasesIt() throws Exception {
+        Actor customer = stripeCustomer("Ravi", "cus_ravi", "pm_visa");
+        Actor rider = stripeRider("Asha", "acct_asha");
+        stub.reply(CHARGE, 200, StubStripe.paymentIntent("pi_ride", "succeeded"));
+        Payment payment = awaitPayment(completeRide(customer, rider).tripId(), PaymentStatus.CAPTURED);
+
+        // the card money is in Stripe's PENDING balance only: nothing is available to transfer yet
+        stub.reply("GET /v1/balance", 200, balance("[{\"amount\":0,\"currency\":\"usd\"}]", "[{\"amount\":999,\"currency\":\"usd\"}]"));
+        JsonNode payout = body(call(HttpMethod.POST, "/api/riders/me/payouts", rider, null).andExpect(status().isCreated()));
+
+        assertThat(payout.get("status").asText()).isEqualTo("AWAITING_FUNDS");
+        assertThat(stub.calls("POST /v1/transfers")).isEmpty();                       // no refused transfer was even attempted
+        JsonNode funding = fetch("/api/admin/payouts/funding", admin());
+        assertThat(funding.get("providerAvailable").decimalValue()).isEqualByComparingTo("0.00");
+        assertThat(funding.get("awaitingCount").asInt()).isEqualTo(1);
+
+        // Stripe settles the funds and says so: the waiting payout goes out straight away, not at the next 15-minute poll
+        stub.reply("GET /v1/balance", 200, balance("[{\"amount\":5000,\"currency\":\"usd\"}]", "[]"));
+        stub.reply("POST /v1/transfers", 200, "{\"id\":\"tr_1\",\"object\":\"transfer\"}");
+        webhook("balance.available", "{\"object\":\"balance\",\"available\":[{\"amount\":5000,\"currency\":\"usd\"}]}")
+                .andExpect(status().isOk()).andExpect(content().string("HANDLED"));
+
+        await().atMost(Duration.ofSeconds(5)).pollInterval(Duration.ofMillis(50))
+                .until(() -> payoutRepo.findAll().get(0).getStatus() == PayoutStatus.PAID);
+        var transfer = stub.only("POST /v1/transfers");
+        assertThat(transfer.form("amount")).isEqualTo(cents(payment.getRiderAmount()));
+        assertThat(transfer.form("destination")).isEqualTo("acct_asha");
+        assertThat(ledger.balance(ledger.riderAccount(rider.id()))).isEqualByComparingTo("0");
+        assertThat(ledger.trialBalance().balanced()).isTrue();
+    }
+
+    @Test
+    void ifStripeItselfRefusesTheTransferForLackOfFundsThePayoutWaitsAndIsRetriedWithTheSameKey() throws Exception {
+        Actor customer = stripeCustomer("Ravi", "cus_ravi", "pm_visa");
+        Actor rider = stripeRider("Asha", "acct_asha");
+        stub.reply(CHARGE, 200, StubStripe.paymentIntent("pi_ride", "succeeded"));
+        awaitPayment(completeRide(customer, rider).tripId(), PaymentStatus.CAPTURED);
+
+        stub.reply("GET /v1/balance", 200, balance("[{\"amount\":999999,\"currency\":\"usd\"}]", "[]"));   // looks fine to us ...
+        stub.replyOnce("POST /v1/transfers", 400, StubStripe.error("invalid_request_error", "balance_insufficient", "Insufficient funds"));   // ... but not to Stripe
+        stub.reply("POST /v1/transfers", 200, "{\"id\":\"tr_2\",\"object\":\"transfer\"}");
+
+        JsonNode payout = body(call(HttpMethod.POST, "/api/riders/me/payouts", rider, null).andExpect(status().isCreated()));
+        assertThat(payout.get("status").asText()).isEqualTo("AWAITING_FUNDS");
+        assertThat(payoutRepo.findAll().get(0).getAttempts()).isZero();
+
+        clock.advance(Duration.ofMinutes(16));
+        payoutService.retryDue();
+
+        assertThat(payoutRepo.findAll().get(0).getStatus()).isEqualTo(PayoutStatus.PAID);
+        var transfers = stub.calls("POST /v1/transfers");
+        assertThat(transfers).hasSize(2);
+        assertThat(transfers.get(1).header("Idempotency-Key")).isEqualTo(transfers.get(0).header("Idempotency-Key"));
+    }
+
+    @Test
+    void ifTheBalanceCannotBeReadTheTransferIsStillAttemptedBecauseTheCheckIsOnlyAdvisory() throws Exception {
+        Actor customer = stripeCustomer("Ravi", "cus_ravi", "pm_visa");
+        Actor rider = stripeRider("Asha", "acct_asha");
+        stub.reply(CHARGE, 200, StubStripe.paymentIntent("pi_ride", "succeeded"));
+        awaitPayment(completeRide(customer, rider).tripId(), PaymentStatus.CAPTURED);
+
+        stub.reply("GET /v1/balance", 500, StubStripe.error("api_error", null, "boom"));
+        stub.reply("POST /v1/transfers", 200, "{\"id\":\"tr_3\",\"object\":\"transfer\"}");
+
+        JsonNode payout = body(call(HttpMethod.POST, "/api/riders/me/payouts", rider, null).andExpect(status().isCreated()));
+        assertThat(payout.get("status").asText()).isEqualTo("PAID");
+    }
+
     // ---------------------------------------------------------------- late confirmation by webhook
 
     @Test
@@ -334,6 +408,10 @@ class StripeFlowIntegrationTest extends ApiTestBase {
         var c = customerRepo.findById(customer.id()).orElseThrow();
         c.setProviderCustomerId(stripeCustomerId);
         customerRepo.save(c);
+    }
+
+    private static String balance(String available, String pending) {
+        return "{\"object\":\"balance\",\"livemode\":false,\"available\":" + available + ",\"pending\":" + pending + "}";
     }
 
     private static String cents(BigDecimal amount) {
