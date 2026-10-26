@@ -1,7 +1,9 @@
 package com.ridehail.rider;
 
 import com.ridehail.common.ApiExceptions.NotFoundException;
+import com.ridehail.common.RiderLocationUpdated;
 import com.ridehail.common.VehicleType;
+import com.ridehail.tracking.LocationRateLimiter;
 import com.ridehail.security.CurrentUser;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.DecimalMax;
@@ -9,6 +11,7 @@ import jakarta.validation.constraints.DecimalMin;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.UUID;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,14 +24,20 @@ class RiderController {
 
     private final RiderRepository riders;
     private final Clock clock;
+    private final LocationRateLimiter rateLimiter;
+    private final ApplicationEventPublisher events;
 
-    RiderController(RiderRepository riders, Clock clock) {
+    RiderController(RiderRepository riders, Clock clock, LocationRateLimiter rateLimiter, ApplicationEventPublisher events) {
         this.riders = riders;
         this.clock = clock;
+        this.rateLimiter = rateLimiter;
+        this.events = events;
     }
 
     record LocationRequest(@DecimalMin("-90") @DecimalMax("90") double lat,
-                           @DecimalMin("-180") @DecimalMax("180") double lon) {}
+                           @DecimalMin("-180") @DecimalMax("180") double lon,
+                           /** Direction of travel in degrees, optional; passed on to the customer's map, not stored. */
+                           @DecimalMin("0") @DecimalMax("360") Double heading) {}
     record RiderResponse(UUID id, String name, VehicleType vehicleType, RiderStatus status, Double lat, Double lon) {
         static RiderResponse of(Rider r) {
             return new RiderResponse(r.getId(), r.getName(), r.getVehicleType(), r.getStatus(), r.getLat(), r.getLon());
@@ -56,12 +65,18 @@ class RiderController {
         return RiderResponse.of(rider);
     }
 
-    /** Called by the rider app every few seconds while online. */
+    /**
+     * Called by the rider app every few seconds while online. Rate limited per rider (429 + Retry-After); while the
+     * rider is serving a trip, the position is also pushed to that trip's customer over the WebSocket.
+     */
     @PutMapping("/location")
     @Transactional
     RiderResponse location(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody LocationRequest l) {
+        rateLimiter.check(CurrentUser.profileId(jwt)); // refuse before any database work
         var rider = find(jwt);
-        rider.updateLocation(l.lat(), l.lon(), Instant.now(clock));
+        Instant now = Instant.now(clock);
+        rider.updateLocation(l.lat(), l.lon(), now);
+        events.publishEvent(new RiderLocationUpdated(rider.getId(), l.lat(), l.lon(), l.heading(), now));
         return RiderResponse.of(rider);
     }
 

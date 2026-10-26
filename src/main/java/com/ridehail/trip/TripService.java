@@ -79,6 +79,24 @@ public class TripService {
         return t;
     }
 
+    public record RiderPosition(UUID tripId, TripStatus status, double lat, double lon, Instant at) {}
+
+    /**
+     * The assigned rider's last reported position, for a customer who has just opened the app or reconnected. Same
+     * rules as the live feed: only the trip's parties (and admins), and only while the trip is active, so a position
+     * is never available before pickup is agreed or after the trip ends.
+     */
+    @Transactional(readOnly = true)
+    public RiderPosition riderPosition(UUID tripId, UUID profileId, boolean admin) {
+        Trip t = getFor(tripId, profileId, admin);
+        if (!EnumSet.of(TripStatus.ACCEPTED, TripStatus.ARRIVED, TripStatus.IN_PROGRESS).contains(t.getStatus())) {
+            throw new ConflictException("Rider location is only available while the trip is active");
+        }
+        var rider = riders.findById(t.getRiderId()).orElseThrow(() -> new NotFoundException("Rider", t.getRiderId()));
+        if (rider.getLat() == null || rider.getLon() == null) throw new NotFoundException("Rider location", t.getRiderId());
+        return new RiderPosition(t.getId(), t.getStatus(), rider.getLat(), rider.getLon(), rider.getLocationUpdatedAt());
+    }
+
     @Transactional
     public Trip riderArrived(UUID tripId, UUID riderId) {
         Trip t = ownedByRider(tripId, riderId);

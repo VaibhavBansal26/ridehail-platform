@@ -161,6 +161,64 @@ class WebSocketPushTest {
     }
 
     @Test
+    void theCustomerSeesTheRidersPositionLiveOverTheSocketAndNoOneElseDoes() throws Exception {
+        User rider = register("rider", "SEDAN");
+        User customer = register("customer", null);
+        User stranger = register("stranger", null);
+
+        var customerSocket = connect(customer.token());
+        var customerFeed = subscribe(customerSocket, "/user/queue/location");
+        var customerTrips = subscribe(customerSocket, "/user/queue/trips");
+        var strangerFeed = subscribe(connect(stranger.token()), "/user/queue/location");
+        var riderOffers = subscribe(connect(rider.token()), "/user/queue/offers");   // before the offer goes out
+
+        rest("/api/riders/me/online", rider.token(), Map.of("lat", PICKUP_LAT + 0.005, "lon", PICKUP_LON));
+        JsonNode quote = rest("/api/fares/quote", customer.token(), Map.of("vehicleType", "SEDAN",
+                "pickupLat", PICKUP_LAT, "pickupLon", PICKUP_LON, "dropLat", 12.9352, "dropLon", 77.6245));
+        JsonNode trip = rest("/api/trips", customer.token(), Map.of("quoteId", quote.get("quoteId").asText()));
+        Map<String, Object> offer = await(riderOffers, "OFFER_RECEIVED");
+        rest("/api/riders/me/offers/" + offer.get("offerId") + "/accept", rider.token(), null);
+
+        // the rider's app reports where it is; the customer's map gets it
+        restPut("/api/riders/me/location", rider.token(), Map.of("lat", 12.9720, "lon", 77.5950, "heading", 45.0));
+        Map<String, Object> position = await(customerFeed, "RIDER_LOCATION");
+        assertThat(position.get("tripId")).isEqualTo(trip.get("id").asText());
+        assertThat(position.get("lat")).isEqualTo(12.9720);
+        assertThat(position.get("lon")).isEqualTo(77.5950);
+        assertThat(position.get("heading")).isEqualTo(45.0);
+        assertThat(position.get("status")).isEqualTo("ACCEPTED");
+
+        assertThat(strangerFeed.poll(1, TimeUnit.SECONDS)).isNull();           // someone else's trip is not theirs to watch
+
+        // after the trip ends the feed goes quiet even though the rider keeps reporting
+        for (String step : new String[] {"arrive", "start", "complete"}) {
+            rest("/api/trips/" + trip.get("id").asText() + "/" + step, rider.token(), null);
+        }
+        Thread.sleep(2100);                                                    // let the per-trip push interval pass
+        customerFeed.clear();
+        restPut("/api/riders/me/location", rider.token(), Map.of("lat", 12.9000, "lon", 77.6000));
+        assertThat(customerFeed.poll(1, TimeUnit.SECONDS)).isNull();
+        // wait for the payment receipt so the background capture cannot leak into the next test
+        await(customerTrips, "PAYMENT_CAPTURED");
+    }
+
+    @Test
+    void onlyCustomersMaySubscribeToTheLocationFeed() throws Exception {
+        User rider = register("rider", "SEDAN");
+        User customer = register("customer", null);
+
+        // a rider asking for the customer's location feed is refused and disconnected
+        StompSession s = connect(rider.token());
+        s.subscribe("/user/queue/location", handler(new LinkedBlockingQueue<>()));
+        awaitDisconnected(s);
+        // while a customer may
+        StompSession ok = connect(customer.token());
+        ok.subscribe("/user/queue/location", handler(new LinkedBlockingQueue<>()));
+        Thread.sleep(500);
+        assertThat(ok.isConnected()).isTrue();
+    }
+
+    @Test
     void connectionWithoutAValidAccessTokenIsRefused() {
         assertThatThrownBy(() -> connect(null)).isNotNull();
         assertThatThrownBy(() -> connect("not-a-jwt")).isNotNull();
@@ -259,6 +317,14 @@ class WebSocketPushTest {
     private JsonNode login(User u) {
         return rest.postForObject("/api/auth/login",
                 Map.of("phone", phones.get(u.id().toString()), "password", "password123"), JsonNode.class);
+    }
+
+    private JsonNode restPut(String url, String token, Object body) {
+        var headers = new HttpHeaders();
+        headers.setBearerAuth(token);
+        var response = rest.exchange(url, HttpMethod.PUT, new HttpEntity<>(body, headers), JsonNode.class);
+        assertThat(response.getStatusCode().is2xxSuccessful()).as("PUT " + url + " -> " + response.getStatusCode()).isTrue();
+        return response.getBody();
     }
 
     private JsonNode rest(String url, String token, Object body) {

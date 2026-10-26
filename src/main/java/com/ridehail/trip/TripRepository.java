@@ -10,6 +10,9 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface TripRepository extends JpaRepository<Trip, UUID> {
     Optional<Trip> findByQuoteId(UUID quoteId);
 
+    /** The rider's current trip, if any (a rider serves one trip at a time). */
+    Optional<Trip> findFirstByRiderIdAndStatusIn(UUID riderId, Collection<TripStatus> statuses);
+
     Page<Trip> findByStatus(TripStatus status, Pageable pageable);
 
     boolean existsByCustomerIdAndStatusIn(UUID customerId, Collection<TripStatus> statuses);

@@ -23,6 +23,8 @@ class StompAuthInterceptor implements ChannelInterceptor {
 
     static final String OFFERS = "/user/queue/offers";
     static final String TRIPS = "/user/queue/trips";
+    /** Live rider position for the customer of the rider's active trip. Customers only. */
+    static final String LOCATION = "/user/queue/location";
 
     private final JwtDecoder accessDecoder;
 
@@ -63,6 +65,7 @@ class StompAuthInterceptor implements ChannelInterceptor {
     private static boolean allowed(Role role, String destination) {
         if (OFFERS.equals(destination)) return role == Role.RIDER;
         if (TRIPS.equals(destination)) return role == Role.CUSTOMER || role == Role.RIDER;
+        if (LOCATION.equals(destination)) return role == Role.CUSTOMER;
         return false;
     }
 }

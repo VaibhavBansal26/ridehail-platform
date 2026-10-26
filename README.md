@@ -5,7 +5,7 @@ A ride-sharing platform. This repository holds the Spring Boot 3 (Java 21) backe
 - **Dynamic fares:** upfront quotes with demand/supply surge pricing, locked at booking.
 - **Dispatch:** nearest-rider offers with timeouts; the rider accepts or declines.
 - **Auth:** JWT with `CUSTOMER`, `RIDER`, `ADMIN` roles.
-- **Realtime:** STOMP WebSocket push for offers and trip updates (`/ws`).
+- **Realtime:** STOMP WebSocket push for offers, trip updates and the rider's live location (`/ws`; see [docs/LIVE_LOCATION.md](docs/LIVE_LOCATION.md)), with rate limiting.
 - **Payments:** charge on trip completion, double-entry ledger, commission, rider payouts (which wait for the provider's settled funds), refunds.
 - **Stripe:** charges, refunds, Connect payouts and signed webhooks behind a `PaymentGateway` port (simulated gateway for dev/tests).
 

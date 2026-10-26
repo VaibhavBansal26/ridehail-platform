@@ -20,6 +20,18 @@ public final class ApiExceptions {
         public BadGatewayException(String message, Throwable cause) { super(message, cause); }
     }
 
+    /** Too many requests from this caller; they may retry after the given delay. */
+    public static class TooManyRequestsException extends RuntimeException {
+        private final long retryAfterSeconds;
+
+        public TooManyRequestsException(String message, long retryAfterSeconds) {
+            super(message);
+            this.retryAfterSeconds = retryAfterSeconds;
+        }
+
+        public long retryAfterSeconds() { return retryAfterSeconds; }
+    }
+
     public static class ForbiddenException extends RuntimeException {
         public ForbiddenException(String message) { super(message); }
     }

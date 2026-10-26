@@ -4,10 +4,12 @@ import com.ridehail.common.ApiExceptions.BadGatewayException;
 import com.ridehail.common.ApiExceptions.ConflictException;
 import com.ridehail.common.ApiExceptions.ForbiddenException;
 import com.ridehail.common.ApiExceptions.NotFoundException;
+import com.ridehail.common.ApiExceptions.TooManyRequestsException;
 import com.ridehail.common.ApiExceptions.UnauthorizedException;
 import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -33,6 +35,14 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BadGatewayException.class)
     ProblemDetail badGateway(BadGatewayException e) {
         return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_GATEWAY, e.getMessage());
+    }
+
+    /** 429 with Retry-After, so well-behaved clients back off by exactly as long as needed. */
+    @ExceptionHandler(TooManyRequestsException.class)
+    ResponseEntity<ProblemDetail> tooMany(TooManyRequestsException e) {
+        return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+                .header("Retry-After", String.valueOf(e.retryAfterSeconds()))
+                .body(ProblemDetail.forStatusAndDetail(HttpStatus.TOO_MANY_REQUESTS, e.getMessage()));
     }
 
     @ExceptionHandler(ForbiddenException.class)
