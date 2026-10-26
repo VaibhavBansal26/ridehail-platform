@@ -11,9 +11,9 @@
   </parent>
 
   <groupId>com.ridehail</groupId>
-  <artifactId>ridehail-backend</artifactId>
+  <artifactId>ridehail-platform</artifactId>
   <version>0.1.0</version>
-  <name>ridehail-backend</name>
+  <name>ridehail-platform</name>
 
   <properties>
     <java.version>21</java.version>

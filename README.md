@@ -1,6 +1,6 @@
-# ridehail-backend
+# ridehail-platform
 
-Spring Boot 3 (Java 21) backend for a ride-sharing platform: riders (drivers), customers and an admin panel API.
+A ride-sharing platform. This repository holds the Spring Boot 3 (Java 21) backend: the API behind the rider (driver) app, the customer app and the admin panel.
 
 - **Dynamic fares:** upfront quotes with demand/supply surge pricing, locked at booking.
 - **Dispatch:** nearest-rider offers with timeouts; the rider accepts or declines.
