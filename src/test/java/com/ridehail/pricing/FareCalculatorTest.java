@@ -8,7 +8,12 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootTest(properties = "ridehail.dispatch.expiry-scan-ms=3600000")
+// Own in-memory database and silent schedulers: a second Spring context sharing another test's database would
+// re-create its tables and run background retries against its rows.
+@SpringBootTest(properties = {
+        "ridehail.dispatch.expiry-scan-ms=3600000",
+        "ridehail.payments.retry-scan-ms=3600000",
+        "spring.datasource.url=jdbc:h2:mem:fare-calculator;MODE=PostgreSQL;DB_CLOSE_DELAY=-1"})
 class FareCalculatorTest {
 
     @Autowired FareCalculator calculator;
