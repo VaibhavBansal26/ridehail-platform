@@ -1,0 +1,21 @@
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/ridehail}
+    username: ${DB_USER:ridehail}
+    password: ${DB_PASSWORD:ridehail}
+  jpa:
+    hibernate:
+      ddl-auto: validate   # schema is owned by migrations (add Flyway before first deploy)
+
+ridehail:
+  security:
+    jwt-secret: ${JWT_SECRET}            # no default: the app refuses to start without it
+    allowed-origins: ${ALLOWED_ORIGINS}  # comma-separated, e.g. https://admin.example.com
+    bootstrap-admin:
+      password: ${ADMIN_PASSWORD}
+  payments:
+    gateway: stripe   # the simulated gateway never loads in prod
+  stripe:
+    api-key: ${STRIPE_API_KEY}                 # no defaults: startup fails fast if any is missing
+    webhook-secret: ${STRIPE_WEBHOOK_SECRET}
+    publishable-key: ${STRIPE_PUBLISHABLE_KEY}

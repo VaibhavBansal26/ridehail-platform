@@ -1,0 +1,3 @@
+package com.ridehail.ledger;
+
+public enum TxKind { PAYMENT_CAPTURE, PAYMENT_REFUND, PAYOUT_RESERVE, PAYOUT_SETTLE, PAYOUT_REVERSE }

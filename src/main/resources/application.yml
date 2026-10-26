@@ -1,0 +1,68 @@
+spring:
+  application:
+    name: ridehail-backend
+  datasource:
+    url: jdbc:h2:mem:ridehail;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    open-in-view: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+ridehail:
+  security:
+    # DEV ONLY default. Production must supply JWT_SECRET (>= 32 bytes), see application-prod.yml.
+    jwt-secret: dev-only-secret-change-me-dev-only-secret-change-me
+    access-ttl-minutes: 15
+    refresh-ttl-days: 7
+    allowed-origins:
+      - "http://localhost:*"
+    bootstrap-admin:
+      phone: admin
+      password: ${ADMIN_PASSWORD:dev-admin-password}
+  pricing:
+    currency: USD
+    quote-ttl-seconds: 120
+    road-factor: 1.3
+    avg-speed-kmh: 25
+    rates:
+      BIKE:  { base: 0.80, per-km: 0.40, per-min: 0.08, minimum: 2.00 }
+      AUTO:  { base: 1.00, per-km: 0.60, per-min: 0.10, minimum: 2.50 }
+      SEDAN: { base: 1.50, per-km: 0.90, per-min: 0.15, minimum: 4.00 }
+      SUV:   { base: 2.50, per-km: 1.30, per-min: 0.20, minimum: 6.00 }
+    surge:
+      radius-km: 3.0
+      demand-window-minutes: 10
+      threshold: 1.0      # demand/supply ratio at which surge starts
+      slope: 0.5          # extra multiplier per unit of ratio above threshold
+      max-multiplier: 3.0
+  stripe:
+    # Only used when ridehail.payments.gateway=stripe. Keys come from the environment, never from git.
+    api-key: ${STRIPE_API_KEY:}
+    webhook-secret: ${STRIPE_WEBHOOK_SECRET:}       # comma-separated: one whsec_ per Stripe webhook endpoint
+    publishable-key: ${STRIPE_PUBLISHABLE_KEY:}   # handed to the mobile SDK for card setup
+    api-base:                                       # blank = https://api.stripe.com (override only in tests)
+    max-network-retries: 2                          # safe: every call carries an idempotency key
+    connect-country:                                # e.g. US; blank = the platform account's country
+    onboarding-return-url: ${STRIPE_ONBOARDING_RETURN_URL:ridehail://payouts/done}
+    onboarding-refresh-url: ${STRIPE_ONBOARDING_REFRESH_URL:ridehail://payouts/retry}
+  payments:
+    gateway: fake   # fake | stripe
+    commission-rate: 0.20
+    min-payout: 5.00
+    max-attempts: 5           # transient gateway failures before a human has to look
+    retry-backoff-seconds: 30 # doubles on each attempt
+    lease-seconds: 120        # how long an in-flight attempt blocks other workers
+    retry-scan-ms: 5000
+  dispatch:
+    offer-ttl-seconds: 15
+    search-radius-km: 5.0
+    max-offers-per-trip: 5
+    expiry-scan-ms: 2000

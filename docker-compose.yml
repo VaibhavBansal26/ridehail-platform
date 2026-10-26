@@ -1,0 +1,9 @@
+services:
+  postgres:
+    image: postgis/postgis:16-3.4
+    environment:
+      POSTGRES_DB: ridehail
+      POSTGRES_USER: ridehail
+      POSTGRES_PASSWORD: ridehail
+    ports:
+      - "5432:5432"
