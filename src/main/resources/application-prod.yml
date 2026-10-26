@@ -5,7 +5,9 @@ spring:
     password: ${DB_PASSWORD:ridehail}
   jpa:
     hibernate:
-      ddl-auto: validate   # schema is owned by migrations (add Flyway before first deploy)
+      ddl-auto: validate   # the schema is owned by Flyway migrations; the app only checks it matches the entities
+  flyway:
+    enabled: true
 
 ridehail:
   security:

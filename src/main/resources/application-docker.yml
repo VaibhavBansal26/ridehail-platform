@@ -1,0 +1,12 @@
+# Postgres + Flyway with the simulated payment gateway and dev secrets: for `docker compose up` and local runs
+# against a real database. Not for production (use the "prod" profile, which needs real secrets).
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/ridehail}
+    username: ${DB_USER:ridehail}
+    password: ${DB_PASSWORD:ridehail}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true

@@ -9,6 +9,8 @@ spring:
     hibernate:
       ddl-auto: create-drop
     open-in-view: false
+  flyway:
+    enabled: false   # dev/tests use in-memory H2 with generated tables; Postgres profiles turn migrations on
 
 management:
   endpoints:

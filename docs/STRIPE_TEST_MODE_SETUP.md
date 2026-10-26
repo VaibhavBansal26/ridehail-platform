@@ -367,7 +367,7 @@ You're done when A1–A3, B1, C1–C4, D1–D4, E1–E4, F1, G1 all behaved as s
   Refunds, Transfers, Connect accounts and Account Links, and read access to PaymentIntents (refunds read the original payment's currency).
 - [ ] Run with `SPRING_PROFILES_ACTIVE=prod`. It requires the secrets above plus `JWT_SECRET`, `ADMIN_PASSWORD`,
   `ALLOWED_ORIGINS` and the database settings, and it refuses to start with the simulator.
-- [ ] Add Flyway migrations first: the `prod` profile validates the schema rather than creating it.
+- [ ] Database: the `prod` profile runs the Flyway migrations at startup and then validates the schema against the entities.
 - [ ] Alert on the `ERROR`-level log lines for disputes, failed refunds, failed payouts and reversed transfers
   (`Stripe event … needs manual follow-up`) and on any payment or payout in `REQUIRES_ATTENTION`.
 

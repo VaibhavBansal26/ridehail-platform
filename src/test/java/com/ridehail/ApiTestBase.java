@@ -65,10 +65,7 @@ public abstract class ApiTestBase {
     @BeforeEach
     void clean() {
         if (gateway != null) gateway.reset();
-        // the ledger is append-only in production code; tests wipe it directly, keeping the platform's own accounts
-        jdbc.update("delete from ledger_entries");
-        jdbc.update("delete from ledger_transactions");
-        jdbc.update("delete from ledger_accounts where type = 'RIDER_PAYABLE'");
+        wipeLedger();
         payoutRepo.deleteAll();
         paymentRepo.deleteAll();
         offerRepo.deleteAll();
@@ -77,6 +74,13 @@ public abstract class ApiTestBase {
         riderRepo.deleteAll();
         customerRepo.deleteAll();
         accountRepo.findAll().stream().filter(a -> a.getRole() != Role.ADMIN).forEach(accountRepo::delete);
+    }
+
+    /** The ledger is append-only in production; tests wipe it directly, keeping the platform's own accounts. */
+    protected void wipeLedger() {
+        jdbc.update("delete from ledger_entries");
+        jdbc.update("delete from ledger_transactions");
+        jdbc.update("delete from ledger_accounts where type = 'RIDER_PAYABLE'");
     }
 
     // ---------- actors ----------

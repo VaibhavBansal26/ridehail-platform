@@ -1,0 +1,41 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: ridehail
+          POSTGRES_USER: ridehail
+          POSTGRES_PASSWORD: ridehail
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U ridehail -d ridehail"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: maven
+      # With RIDEHAIL_TEST_PG_URL set, the suite also runs on real Postgres: Flyway migrations, schema
+      # validation, ledger triggers, row locking. Without it those tests are skipped (local default).
+      - name: Test (H2 and Postgres)
+        env:
+          RIDEHAIL_TEST_PG_URL: jdbc:postgresql://localhost:5432/ridehail
+        run: mvn -B verify
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -t ridehail-platform:ci .
