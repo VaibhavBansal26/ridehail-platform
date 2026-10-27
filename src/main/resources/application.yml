@@ -66,6 +66,8 @@ ridehail:
     funds-max-wait-days: 10     # ... and give up waiting after this long (card funds normally clear in 2-7 days)
     lease-seconds: 120        # how long an in-flight attempt blocks other workers
     retry-scan-ms: 5000
+  disputes:
+    loss-policy: platform   # who absorbs a dispute we lose: platform (rider keeps earnings) | rider (rider's share is taken back)
   tracking:
     location-updates-per-second: 1.0   # sustained rate a rider app may report its position
     location-burst: 5                  # short bursts allowed above that

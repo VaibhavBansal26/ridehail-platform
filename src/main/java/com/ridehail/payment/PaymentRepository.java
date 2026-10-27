@@ -13,6 +13,11 @@ public interface PaymentRepository extends JpaRepository<Payment, UUID> {
 
     Optional<Payment> findByChargeKey(UUID chargeKey);
 
+    /** The provider's id for the charge (Stripe PaymentIntent), which is how disputes and refunds point back at us. */
+    Optional<Payment> findByGatewayReference(String gatewayReference);
+
+    long countByStatus(PaymentStatus status);
+
     List<Payment> findByStatusAndNextAttemptAtLessThanEqual(PaymentStatus status, Instant cutoff);
 
     boolean existsByCustomerIdAndStatus(UUID customerId, PaymentStatus status);

@@ -13,6 +13,11 @@ import java.util.concurrent.BlockingQueue;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.TimeUnit;
 import com.ridehail.customer.CustomerRepository;
+import com.ridehail.dispute.DisputeNotice;
+import com.ridehail.dispute.DisputeService;
+import com.ridehail.dispute.IncidentService;
+import com.ridehail.dispute.IncidentType;
+import com.ridehail.payment.PaymentRepository;
 import com.ridehail.dispatch.TripOfferRepository;
 import com.ridehail.pricing.FareQuoteRepository;
 import com.ridehail.rider.RiderRepository;
@@ -56,6 +61,9 @@ class WebSocketPushTest {
     @Autowired RiderRepository riderRepo;
     @Autowired CustomerRepository customerRepo;
     @Autowired UserAccountRepository accountRepo;
+    @Autowired PaymentRepository paymentRepo;
+    @Autowired DisputeService disputeService;
+    @Autowired IncidentService incidentService;
 
     private final List<StompSession> sessions = new ArrayList<>();
 
@@ -200,6 +208,46 @@ class WebSocketPushTest {
         assertThat(customerFeed.poll(1, TimeUnit.SECONDS)).isNull();
         // wait for the payment receipt so the background capture cannot leak into the next test
         await(customerTrips, "PAYMENT_CAPTURED");
+    }
+
+    @Test
+    void theRiderIsToldWhenEarningsAreFrozenReleasedOrABankPayoutFailsAndTheCustomerHearsNothingOfIt() throws Exception {
+        User rider = register("rider", "SEDAN");
+        User customer = register("customer", null);
+        var riderSocket = connect(rider.token());
+        var riderOffers = subscribe(riderSocket, "/user/queue/offers");
+        var riderTrips = subscribe(riderSocket, "/user/queue/trips");
+        var customerTrips = subscribe(connect(customer.token()), "/user/queue/trips");
+
+        rest("/api/riders/me/online", rider.token(), Map.of("lat", PICKUP_LAT + 0.005, "lon", PICKUP_LON));
+        JsonNode quote = rest("/api/fares/quote", customer.token(), Map.of("vehicleType", "SEDAN",
+                "pickupLat", PICKUP_LAT, "pickupLon", PICKUP_LON, "dropLat", 12.9352, "dropLon", 77.6245));
+        JsonNode trip = rest("/api/trips", customer.token(), Map.of("quoteId", quote.get("quoteId").asText()));
+        rest("/api/riders/me/offers/" + await(riderOffers, "OFFER_RECEIVED").get("offerId") + "/accept", rider.token(), null);
+        for (String step : new String[] {"arrive", "start", "complete"}) {
+            rest("/api/trips/" + trip.get("id").asText() + "/" + step, rider.token(), null);
+        }
+        await(customerTrips, "PAYMENT_CAPTURED");
+        var payment = paymentRepo.findByTripId(UUID.fromString(trip.get("id").asText())).orElseThrow();
+        var notice = (java.util.function.Function<String, DisputeNotice>) status -> new DisputeNotice("dp_ws", payment.getGatewayReference(),
+                payment.getAmount(), "USD", DisputeNotice.State.valueOf(status), status.toLowerCase(), "fraudulent", null,
+                java.math.BigDecimal.ZERO, null);
+
+        disputeService.apply(notice.apply("OPEN"));
+        Map<String, Object> frozen = await(riderTrips, "FUNDS_ON_HOLD");
+        assertThat(frozen.keySet()).containsOnly("type", "tripId");                 // no amount, no customer detail: the app refetches earnings
+
+        disputeService.apply(notice.apply("WON"));
+        await(riderTrips, "HOLD_ENDED");
+
+        incidentService.record(IncidentType.CONNECT_PAYOUT_FAILED, "po_ws", UUID.fromString(rider.id().toString()), null, null,
+                java.math.BigDecimal.TEN, "USD", "Bank payout failed");
+        Map<String, Object> bank = await(riderTrips, "BANK_PAYOUT_FAILED");
+        assertThat(bank.keySet()).containsOnly("type");
+
+        // none of this is the customer's business
+        Thread.sleep(500);
+        assertThat(customerTrips.stream().map(m -> m.get("type"))).doesNotContain("FUNDS_ON_HOLD", "HOLD_ENDED", "BANK_PAYOUT_FAILED");
     }
 
     @Test

@@ -58,9 +58,23 @@ public class LedgerService {
         }
     }
 
+    /** Opens a rider's accounts: what we owe them, and the part of it currently frozen by a dispute. */
     @Transactional
     public LedgerAccount openRiderAccount(UUID riderId) {
+        open(AccountType.RIDER_FUNDS_HELD, riderId);
         return open(AccountType.RIDER_PAYABLE, riderId);
+    }
+
+    /** Riders registered before disputes existed have no held account yet; it is created the first time it is needed. */
+    @Transactional
+    public LedgerAccount riderHeldAccount(UUID riderId) {
+        return open(AccountType.RIDER_FUNDS_HELD, riderId);
+    }
+
+    /** What is frozen for this rider (zero if they never had anything held). */
+    @Transactional(readOnly = true)
+    public BigDecimal riderHeldBalance(UUID riderId) {
+        return accounts.findByTypeAndOwnerId(AccountType.RIDER_FUNDS_HELD, riderId).map(this::balance).orElse(BigDecimal.ZERO);
     }
 
     @Transactional(readOnly = true)

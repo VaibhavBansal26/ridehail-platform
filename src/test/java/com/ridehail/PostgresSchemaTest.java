@@ -42,7 +42,7 @@ class PostgresSchemaTest {
     @Test
     void flywayAppliedBothMigrations() {
         assertThat(jdbc.queryForList("select version from flyway_schema_history where success order by installed_rank", String.class))
-                .containsExactly("1", "2", "3");
+                .containsExactly("1", "2", "3", "4");
     }
 
     @Test
@@ -121,6 +121,52 @@ class PostgresSchemaTest {
     }
 
     @Test
+    void theDisputeLedgerAccountsAndKindsAreAcceptedAndBogusOnesAreNot() {
+        for (String type : new String[] {"RIDER_FUNDS_HELD", "DISPUTES_IN_PROGRESS", "DISPUTE_LOSSES", "DISPUTE_FEES"}) {
+            assertThat(jdbc.queryForObject("select count(*) from ledger_accounts where type = ?", Integer.class, type)).isGreaterThanOrEqualTo(0);
+        }
+        assertThatThrownBy(() -> jdbc.update("insert into ledger_accounts (id, type, owner_id, currency, created_at) values (?, 'NONSENSE', ?, 'USD', now())",
+                UUID.randomUUID(), UUID.randomUUID())).hasMessageContaining("ledger_accounts_type_check");
+        UUID ok = UUID.randomUUID();
+        jdbc.update("insert into ledger_accounts (id, type, owner_id, currency, created_at) values (?, 'RIDER_FUNDS_HELD', ?, 'USD', now())", ok, UUID.randomUUID());
+        jdbc.update("delete from ledger_accounts where id = ?", ok);
+        UUID txId = UUID.randomUUID();
+        jdbc.update("insert into ledger_transactions (id, ref_key, kind, created_at) values (?, ?, 'DISPUTE_OPEN', now())", txId, "pg-test-kind-" + txId);
+        PostgresTestSupport.wipeLedger(jdbc);
+    }
+
+    @Test
+    void paymentsCanBeDisputedOrChargedBackButNotMadeUp() {
+        for (String status : new String[] {"DISPUTED", "CHARGED_BACK"}) {
+            UUID id = UUID.randomUUID();
+            insertPayment(id, status);
+            jdbc.update("delete from payments where id = ?", id);
+        }
+        assertThatThrownBy(() -> insertPayment(UUID.randomUUID(), "HALF_PAID")).hasMessageContaining("payments_status_check");
+    }
+
+    @Test
+    void aDisputeIsUniquePerProviderIdAndNeverHoldsMoreThanItsAmount() {
+        UUID id = UUID.randomUUID();
+        insertDispute(id, "dp_pg_" + id, "10.00", "4.00");
+        assertThatThrownBy(() -> insertDispute(UUID.randomUUID(), "dp_pg_" + id, "10.00", "4.00")).hasMessageContaining("disputes_provider_id_key");
+        assertThatThrownBy(() -> insertDispute(UUID.randomUUID(), "dp_pg_over_" + id, "10.00", "10.01")).hasMessageContaining("disputes_amounts_check");
+        assertThatThrownBy(() -> insertDispute(UUID.randomUUID(), "dp_pg_zero_" + id, "0.00", "0.00")).hasMessageContaining("disputes_amounts_check");
+        jdbc.update("delete from disputes where provider_id like ?", "dp_pg_%");
+    }
+
+    @Test
+    void theSameProviderProblemCannotBeRaisedTwice() {
+        String ref = "po_pg_" + UUID.randomUUID();
+        insertIncident("CONNECT_PAYOUT_FAILED", ref, "OPEN");
+        assertThatThrownBy(() -> insertIncident("CONNECT_PAYOUT_FAILED", ref, "OPEN")).hasMessageContaining("finance_incidents_ref_key");
+        insertIncident("TRANSFER_REVERSED", ref, "OPEN");        // same provider id under a different type is a different problem
+        assertThatThrownBy(() -> insertIncident("MYSTERY", "x_" + ref, "OPEN")).hasMessageContaining("finance_incidents_type_check");
+        assertThatThrownBy(() -> insertIncident("REFUND_FAILED", "y_" + ref, "LATER")).hasMessageContaining("finance_incidents_status_check");
+        jdbc.update("delete from finance_incidents where provider_ref like ?", "%" + ref);
+    }
+
+    @Test
     void aPaymentsAmountMustEqualCommissionPlusRiderShare() {
         assertThatThrownBy(() -> jdbc.update("""
                 insert into payments (id, trip_id, customer_id, rider_id, amount, commission_amount, rider_amount, currency,
@@ -139,6 +185,25 @@ class PostgresSchemaTest {
                 UUID.randomUUID(), id, cash, debit);
         jdbc.update("insert into ledger_entries (id, transaction_id, account_id, direction, amount, created_at) values (?, ?, ?, 'CREDIT', ?::numeric, now())",
                 UUID.randomUUID(), id, revenue, credit);
+    }
+
+    private void insertPayment(UUID id, String status) {
+        jdbc.update("""
+                insert into payments (id, trip_id, customer_id, rider_id, amount, commission_amount, rider_amount, currency,
+                                      status, attempts, next_attempt_at, charge_key, created_at)
+                values (?, ?, ?, ?, 10.00, 2.00, 8.00, 'USD', ?, 0, now(), ?, now())""",
+                id, UUID.randomUUID(), UUID.randomUUID(), UUID.randomUUID(), status, UUID.randomUUID());
+    }
+
+    private void insertDispute(UUID id, String providerId, String amount, String held) {
+        jdbc.update("""
+                insert into disputes (id, provider_id, matched, amount, currency, status, frozen, rider_held_amount, fee_booked, created_at, updated_at)
+                values (?, ?, false, ?::numeric, 'USD', 'OPEN', false, ?::numeric, 0, now(), now())""", id, providerId, amount, held);
+    }
+
+    private void insertIncident(String type, String ref, String status) {
+        jdbc.update("insert into finance_incidents (id, type, provider_ref, status, created_at) values (?, ?, ?, ?, now())",
+                UUID.randomUUID(), type, ref, status);
     }
 
     private void insertPayout(UUID rider, String status) {

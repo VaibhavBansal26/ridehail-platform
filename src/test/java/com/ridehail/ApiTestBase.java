@@ -66,8 +66,11 @@ public abstract class ApiTestBase {
     void clean() {
         if (gateway != null) gateway.reset();
         wipeLedger();
+        jdbc.update("delete from disputes");
+        jdbc.update("delete from finance_incidents");
         payoutRepo.deleteAll();
-        paymentRepo.deleteAll();
+        // a charge started by the previous test may still be settling in the background; if we collide with it, try again
+        retryOnRace(paymentRepo::deleteAll);
         offerRepo.deleteAll();
         tripRepo.deleteAll();
         quoteRepo.deleteAll();
@@ -76,11 +79,28 @@ public abstract class ApiTestBase {
         accountRepo.findAll().stream().filter(a -> a.getRole() != Role.ADMIN).forEach(accountRepo::delete);
     }
 
+    private static void retryOnRace(Runnable action) {
+        for (int attempt = 1; ; attempt++) {
+            try {
+                action.run();
+                return;
+            } catch (org.springframework.dao.OptimisticLockingFailureException e) {
+                if (attempt >= 10) throw e;
+                try {
+                    Thread.sleep(100);
+                } catch (InterruptedException interrupted) {
+                    Thread.currentThread().interrupt();
+                    throw e;
+                }
+            }
+        }
+    }
+
     /** The ledger is append-only in production; tests wipe it directly, keeping the platform's own accounts. */
     protected void wipeLedger() {
         jdbc.update("delete from ledger_entries");
         jdbc.update("delete from ledger_transactions");
-        jdbc.update("delete from ledger_accounts where type = 'RIDER_PAYABLE'");
+        jdbc.update("delete from ledger_accounts where type in ('RIDER_PAYABLE', 'RIDER_FUNDS_HELD')");
     }
 
     // ---------- actors ----------

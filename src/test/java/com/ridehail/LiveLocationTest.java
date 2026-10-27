@@ -101,6 +101,7 @@ class LiveLocationTest extends ApiTestBase {
         Actor customer = customer("Ravi");
         Ride ride = completeRide(customer, rider);                                       // trip is now COMPLETED
         assertThat(ride.tripId()).isNotNull();
+        awaitCharge(ride.tripId());
 
         putLocation(rider, 12.9000, 77.6000, null).andExpect(status().isOk());
         verify(ws, never()).convertAndSendToUser(eq(customer.id().toString()), eq(FEED), any());
@@ -232,9 +233,16 @@ class LiveLocationTest extends ApiTestBase {
             call(HttpMethod.POST, "/api/trips/" + requested + "/" + step, rider, null).andExpect(status().isOk());
         }
         call(HttpMethod.GET, url, customer, null).andExpect(status().isConflict());     // trip over: no more location
+        awaitCharge(requested);
     }
 
     // ---------------------------------------------------------------- helpers
+
+    /** Completing a trip starts a background charge; let it finish so it cannot overlap the next test. */
+    private void awaitCharge(UUID tripId) {
+        org.awaitility.Awaitility.await().atMost(Duration.ofSeconds(5)).pollInterval(Duration.ofMillis(50)).until(() ->
+                paymentRepo.findByTripId(tripId).map(p -> p.getStatus().name()).orElse("").equals("CAPTURED"));
+    }
 
     private UUID acceptedTrip(Actor customer, Actor rider) throws Exception {
         UUID trip = book(customer, quote(customer).get("quoteId").asText());

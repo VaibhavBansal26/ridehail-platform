@@ -58,6 +58,8 @@ class RideEventPushListener {
                 case TRIP_REQUESTED, RIDER_ARRIVED, TRIP_STARTED, TRIP_COMPLETED, NO_RIDERS_AVAILABLE -> pushTripUpdate(e);
                 case PAYMENT_CAPTURED -> pushPaymentCaptured(e);
                 case PAYMENT_FAILED -> pushPaymentFailed(e);
+                // money notices carry no amount or customer detail: the app refetches /api/riders/me/earnings
+                case FUNDS_ON_HOLD, HOLD_ENDED, BANK_PAYOUT_FAILED -> toUser(e.riderId(), TRIPS, message(e.type().name(), e.tripId()));
                 case OFFER_DECLINED -> { /* the declining rider already knows */ }
             }
         } catch (RuntimeException ex) {

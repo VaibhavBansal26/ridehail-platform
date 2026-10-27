@@ -5,6 +5,8 @@ import com.ridehail.common.ApiExceptions.NotFoundException;
 import com.ridehail.common.RideEvent;
 import com.ridehail.common.RideEvent.Type;
 import com.ridehail.customer.CustomerRepository;
+import com.ridehail.dispute.DisputeRepository;
+import com.ridehail.dispute.DisputeStatus;
 import com.ridehail.ledger.AccountType;
 import com.ridehail.ledger.LedgerService;
 import com.ridehail.ledger.LedgerService.Line;
@@ -42,6 +44,7 @@ public class PaymentService {
 
     private final PaymentRepository payments;
     private final CustomerRepository customers;
+    private final DisputeRepository disputes;
     private final LedgerService ledger;
     private final PaymentGateway gateway;
     private final PaymentProperties props;
@@ -50,11 +53,12 @@ public class PaymentService {
     private final ApplicationEventPublisher events;
     private final Clock clock;
 
-    PaymentService(PaymentRepository payments, CustomerRepository customers, LedgerService ledger,
+    PaymentService(PaymentRepository payments, CustomerRepository customers, DisputeRepository disputes, LedgerService ledger,
                    PaymentGateway gateway, PaymentProperties props, PricingProperties pricing,
                    TransactionTemplate tx, ApplicationEventPublisher events, Clock clock) {
         this.payments = payments;
         this.customers = customers;
+        this.disputes = disputes;
         this.ledger = ledger;
         this.gateway = gateway;
         this.props = props;
@@ -77,6 +81,9 @@ public class PaymentService {
         }
         if (payments.existsByCustomerIdAndStatus(customerId, PaymentStatus.REQUIRES_ATTENTION)) {
             throw new ConflictException("You have an unpaid trip; resolve it before booking another ride");
+        }
+        if (disputes.existsByCustomerIdAndStatus(customerId, DisputeStatus.OPEN)) {
+            throw new ConflictException("A payment of yours is under dispute; rides are paused until it is resolved");
         }
     }
 

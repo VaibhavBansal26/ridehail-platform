@@ -21,4 +21,8 @@ public interface PayoutRepository extends JpaRepository<Payout, UUID> {
     List<Payout> findByStatusOrderByCreatedAtAsc(PayoutStatus status);
 
     Page<Payout> findByStatus(PayoutStatus status, Pageable pageable);
+
+    java.util.Optional<Payout> findByGatewayReference(String gatewayReference);
+
+    long countByStatus(PayoutStatus status);
 }

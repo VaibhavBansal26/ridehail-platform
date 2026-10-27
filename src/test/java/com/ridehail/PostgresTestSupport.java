@@ -34,7 +34,7 @@ final class PostgresTestSupport {
         try {
             jdbc.update("delete from ledger_entries");
             jdbc.update("delete from ledger_transactions");
-            jdbc.update("delete from ledger_accounts where type = 'RIDER_PAYABLE'");
+            jdbc.update("delete from ledger_accounts where type in ('RIDER_PAYABLE', 'RIDER_FUNDS_HELD')");
         } finally {
             jdbc.execute("ALTER TABLE ledger_entries ENABLE TRIGGER USER");
             jdbc.execute("ALTER TABLE ledger_transactions ENABLE TRIGGER USER");

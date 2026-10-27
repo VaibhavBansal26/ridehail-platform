@@ -8,6 +8,7 @@ A ride-sharing platform. This repository holds the Spring Boot 3 (Java 21) backe
 - **Realtime:** STOMP WebSocket push for offers, trip updates and the rider's live location (`/ws`; see [docs/LIVE_LOCATION.md](docs/LIVE_LOCATION.md)), with rate limiting.
 - **Payments:** charge on trip completion, double-entry ledger, commission, rider payouts (which wait for the provider's settled funds), refunds.
 - **Stripe:** charges, refunds, Connect payouts and signed webhooks behind a `PaymentGateway` port (simulated gateway for dev/tests).
+- **Disputes & provider problems:** chargebacks are recorded, the rider's share is frozen in the ledger and settled when decided; failed bank payouts, reversed transfers and failed refunds become admin incidents ([docs/DISPUTES.md](docs/DISPUTES.md)).
 
 ## Run
 

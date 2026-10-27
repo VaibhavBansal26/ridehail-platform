@@ -2,6 +2,7 @@ package com.ridehail.payment;
 
 import com.ridehail.common.ApiExceptions.ConflictException;
 import com.ridehail.common.ApiExceptions.NotFoundException;
+import com.ridehail.dispute.IncidentService;
 import com.ridehail.ledger.AccountType;
 import com.ridehail.ledger.LedgerService;
 import com.ridehail.ledger.LedgerService.Line;
@@ -54,17 +55,19 @@ public class PayoutService {
     private final PayoutRepository payouts;
     private final RiderRepository riders;
     private final LedgerService ledger;
+    private final IncidentService incidents;
     private final PaymentGateway gateway;
     private final PaymentProperties props;
     private final PricingProperties pricing;
     private final TransactionTemplate tx;
     private final Clock clock;
 
-    PayoutService(PayoutRepository payouts, RiderRepository riders, LedgerService ledger, PaymentGateway gateway,
+    PayoutService(PayoutRepository payouts, RiderRepository riders, LedgerService ledger, IncidentService incidents, PaymentGateway gateway,
                   PaymentProperties props, PricingProperties pricing, TransactionTemplate tx, Clock clock) {
         this.payouts = payouts;
         this.riders = riders;
         this.ledger = ledger;
+        this.incidents = incidents;
         this.gateway = gateway;
         this.props = props;
         this.pricing = pricing;
@@ -142,6 +145,9 @@ public class PayoutService {
     private Payout reserve(UUID riderId, BigDecimal requested) {
         var rider = riders.findById(riderId).orElseThrow(() -> new NotFoundException("Rider", riderId));
         if (rider.getPayoutAccountToken() == null) throw new ConflictException("Add a payout account first");
+        if (incidents.hasOpenBankIssue(riderId)) {
+            throw new ConflictException("Your bank rejected the last payout. Update your bank details, then try again");
+        }
 
         var account = ledger.lockRiderAccount(riderId); // serializes concurrent payout requests for this rider
         if (payouts.existsByRiderIdAndStatusIn(riderId, OPEN)) throw new ConflictException("A payout is already in progress");

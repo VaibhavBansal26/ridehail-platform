@@ -9,6 +9,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import com.fasterxml.jackson.databind.JsonNode;
 import com.ridehail.ledger.AccountType;
 import com.ridehail.ledger.LedgerService;
+import com.ridehail.dispute.DisputeRepository;
+import com.ridehail.dispute.DisputeStatus;
+import com.ridehail.dispute.FinanceIncidentRepository;
+import com.ridehail.dispute.IncidentStatus;
+import com.ridehail.dispute.IncidentType;
 import com.ridehail.payment.Payment;
 import com.ridehail.payment.PaymentStatus;
 import com.ridehail.payment.PayoutService;
@@ -63,6 +68,8 @@ class StripeFlowIntegrationTest extends ApiTestBase {
 
     @Autowired LedgerService ledger;
     @Autowired PayoutService payoutService;
+    @Autowired DisputeRepository disputeRepo;
+    @Autowired FinanceIncidentRepository incidentRepo;
 
     @BeforeEach
     void resetStripe() {
@@ -332,6 +339,162 @@ class StripeFlowIntegrationTest extends ApiTestBase {
         assertThat(payout.get("status").asText()).isEqualTo("PAID");
     }
 
+    // ---------------------------------------------------------------- disputes and payout problems
+
+    @Test
+    void aChargebackWebhookFreezesTheRidersShareAndGivesAdminsTheDeadlineAndALinkToRespond() throws Exception {
+        Payment payment = paidRide();
+        Actor admin = admin();
+
+        webhook("charge.dispute.created", dispute("dp_1", "needs_response", "pi_ride", payment, 1500))
+                .andExpect(status().isOk()).andExpect(content().string("HANDLED"));
+
+        var d = disputeRepo.findByProviderId("dp_1").orElseThrow();
+        assertThat(d.getStatus()).isEqualTo(DisputeStatus.OPEN);
+        assertThat(d.isFrozen()).isTrue();
+        assertThat(d.getFeeBooked()).isEqualByComparingTo("15.00");                  // Stripe's dispute fee, from the event
+        assertThat(ledger.riderHeldBalance(payment.getRiderId())).isEqualByComparingTo(payment.getRiderAmount());
+        assertThat(paymentRepo.findById(payment.getId()).orElseThrow().getStatus()).isEqualTo(PaymentStatus.DISPUTED);
+
+        JsonNode view = fetch("/api/admin/disputes?status=OPEN", admin).get("items").get(0);
+        assertThat(view.get("providerUrl").asText()).isEqualTo("https://dashboard.stripe.com/test/disputes/dp_1");
+        assertThat(java.time.Instant.parse(view.get("evidenceDueBy").asText()).getEpochSecond()).isEqualTo(1893456000L);
+        assertThat(view.get("reason").asText()).isEqualTo("fraudulent");
+
+        // Stripe tells us we lost
+        webhook("charge.dispute.closed", dispute("dp_1", "lost", "pi_ride", payment, 1500)).andExpect(status().isOk());
+
+        assertThat(disputeRepo.findByProviderId("dp_1").orElseThrow().getStatus()).isEqualTo(DisputeStatus.LOST);
+        assertThat(paymentRepo.findById(payment.getId()).orElseThrow().getStatus()).isEqualTo(PaymentStatus.CHARGED_BACK);
+        assertThat(ledger.balance(ledger.platform(AccountType.DISPUTE_LOSSES))).isEqualByComparingTo(payment.getAmount());
+        assertThat(ledger.riderHeldBalance(payment.getRiderId())).isEqualByComparingTo("0");
+        assertThat(ledger.trialBalance().balanced()).isTrue();
+    }
+
+    @Test
+    void theSameDisputeEventRedeliveredByStripeIsAppliedOnce() throws Exception {
+        Payment payment = paidRide();
+        String payload = event("evt_dispute_1", "charge.dispute.created", dispute("dp_1", "needs_response", "pi_ride", payment, 0));
+        long now = System.currentTimeMillis() / 1000;
+
+        postRaw(payload, sign(payload, now, SECRET)).andExpect(content().string("HANDLED"));
+        postRaw(payload, sign(payload, now, SECRET)).andExpect(content().string("DUPLICATE"));
+
+        assertThat(disputeRepo.count()).isEqualTo(1);
+        assertThat(jdbc.queryForObject("select count(*) from ledger_transactions where ref_key like 'DISPUTE_%'", Integer.class)).isEqualTo(1);
+    }
+
+    @Test
+    void eventsArrivingOutOfOrderStillEndInTheRightState() throws Exception {
+        Payment payment = paidRide();
+
+        webhook("charge.dispute.closed", dispute("dp_1", "won", "pi_ride", payment, 0)).andExpect(status().isOk());           // decision first
+        webhook("charge.dispute.created", dispute("dp_1", "needs_response", "pi_ride", payment, 0)).andExpect(status().isOk());   // opening, late
+
+        assertThat(disputeRepo.findByProviderId("dp_1").orElseThrow().getStatus()).isEqualTo(DisputeStatus.WON);
+        assertThat(paymentRepo.findById(payment.getId()).orElseThrow().getStatus()).isEqualTo(PaymentStatus.CAPTURED);
+        assertThat(ledger.balance(ledger.platform(AccountType.CASH))).isEqualByComparingTo(payment.getAmount());
+        assertThat(ledger.riderHeldBalance(payment.getRiderId())).isEqualByComparingTo("0");
+        assertThat(ledger.trialBalance().balanced()).isTrue();
+    }
+
+    @Test
+    void anEarlyWarningIsRecordedWithoutTouchingMoneyAndAClosedWarningStaysThatWay() throws Exception {
+        Payment payment = paidRide();
+
+        webhook("charge.dispute.created", dispute("dp_1", "warning_needs_response", "pi_ride", payment, 0)).andExpect(status().isOk());
+        assertThat(disputeRepo.findByProviderId("dp_1").orElseThrow().getStatus()).isEqualTo(DisputeStatus.INQUIRY);
+        assertThat(ledger.riderHeldBalance(payment.getRiderId())).isEqualByComparingTo("0");
+
+        webhook("charge.dispute.closed", dispute("dp_1", "warning_closed", "pi_ride", payment, 0)).andExpect(status().isOk());
+        assertThat(disputeRepo.findByProviderId("dp_1").orElseThrow().getStatus()).isEqualTo(DisputeStatus.CLOSED);
+        assertThat(ledger.balance(ledger.platform(AccountType.CASH))).isEqualByComparingTo(payment.getAmount());
+    }
+
+    @Test
+    void aDisputeOverAChargeWeDoNotKnowIsRecordedForAPersonAndStripeStillGetsA200() throws Exception {
+        paidRide();
+        webhook("charge.dispute.created", "{\"id\":\"dp_9\",\"amount\":5000,\"currency\":\"usd\",\"payment_intent\":\"pi_somebody_else\","
+                + "\"reason\":\"general\",\"status\":\"needs_response\",\"evidence_details\":{\"due_by\":1893456000}}")
+                .andExpect(status().isOk());
+
+        var d = disputeRepo.findByProviderId("dp_9").orElseThrow();
+        assertThat(d.isMatched()).isFalse();
+        assertThat(d.getStatus()).isEqualTo(DisputeStatus.OPEN);
+        assertThat(jdbc.queryForObject("select count(*) from ledger_transactions where ref_key like 'DISPUTE_%'", Integer.class)).isZero();
+    }
+
+    @Test
+    void whenStripeCannotPayARidersBankTheirWithdrawalsPauseUntilTheyUpdateIt() throws Exception {
+        Payment payment = paidRide();
+        Actor rider = riderOf(payment);
+
+        webhookFor("acct_asha", "payout.failed", "{\"id\":\"po_1\",\"amount\":799,\"currency\":\"usd\",\"status\":\"failed\","
+                + "\"failure_code\":\"account_closed\",\"failure_message\":\"The bank account has been closed.\"}").andExpect(status().isOk());
+
+        var incident = incidentRepo.findByTypeAndProviderRef(IncidentType.CONNECT_PAYOUT_FAILED, "po_1").orElseThrow();
+        assertThat(incident.getRiderId()).isEqualTo(rider.id());
+        assertThat(incident.getStatus()).isEqualTo(IncidentStatus.OPEN);
+        assertThat(incident.getDetail()).contains("account_closed");
+        assertThat(incident.getAmount()).isEqualByComparingTo("7.99");
+        call(HttpMethod.POST, "/api/riders/me/payouts", rider, null).andExpect(status().isConflict());
+        assertThat(fetch("/api/riders/me/earnings", rider).get("payoutBlockedReason").asText()).contains("bank");
+        assertThat(fetch("/api/admin/finance/attention", admin()).get("needsAction").asBoolean()).isTrue();
+
+        // the rider adds a working bank account in Stripe's dashboard: Stripe sends this for their account
+        stub.reply("GET /v1/balance", 200, balance("[{\"amount\":999999,\"currency\":\"usd\"}]", "[]"));
+        stub.reply("POST /v1/transfers", 200, "{\"id\":\"tr_ok\",\"object\":\"transfer\"}");
+        webhookFor("acct_asha", "account.external_account.updated", "{\"id\":\"ba_new\",\"object\":\"bank_account\",\"account\":\"acct_asha\"}")
+                .andExpect(status().isOk());
+
+        assertThat(incidentRepo.findByTypeAndProviderRef(IncidentType.CONNECT_PAYOUT_FAILED, "po_1").orElseThrow().getStatus())
+                .isEqualTo(IncidentStatus.RESOLVED);
+        call(HttpMethod.POST, "/api/riders/me/payouts", rider, null).andExpect(status().isCreated());
+    }
+
+    @Test
+    void aFailedPayoutToThePlatformsOwnBankIsAnIncidentButPausesNoRider() throws Exception {
+        Payment payment = paidRide();
+        Actor rider = riderOf(payment);
+
+        webhook("payout.failed", "{\"id\":\"po_platform\",\"amount\":50000,\"currency\":\"usd\",\"failure_code\":\"insufficient_funds\"}")
+                .andExpect(status().isOk());
+
+        var incident = incidentRepo.findByTypeAndProviderRef(IncidentType.PLATFORM_PAYOUT_FAILED, "po_platform").orElseThrow();
+        assertThat(incident.getRiderId()).isNull();
+        assertThat(incident.getAmount()).isEqualByComparingTo("500.00");
+        stub.reply("GET /v1/balance", 200, balance("[{\"amount\":999999,\"currency\":\"usd\"}]", "[]"));
+        stub.reply("POST /v1/transfers", 200, "{\"id\":\"tr_ok\",\"object\":\"transfer\"}");
+        call(HttpMethod.POST, "/api/riders/me/payouts", rider, null).andExpect(status().isCreated());
+    }
+
+    @Test
+    void aReversedTransferAndAFailedRefundBecomeIncidentsLinkedToOurRecords() throws Exception {
+        Payment payment = paidRide();
+        Actor rider = riderOf(payment);
+        stub.reply("GET /v1/balance", 200, balance("[{\"amount\":999999,\"currency\":\"usd\"}]", "[]"));
+        stub.reply("POST /v1/transfers", 200, "{\"id\":\"tr_paid\",\"object\":\"transfer\"}");
+        call(HttpMethod.POST, "/api/riders/me/payouts", rider, null).andExpect(status().isCreated());
+
+        webhook("transfer.reversed", "{\"id\":\"tr_paid\",\"amount\":799,\"amount_reversed\":799,\"currency\":\"usd\",\"destination\":\"acct_asha\"}")
+                .andExpect(status().isOk());
+        webhook("refund.failed", "{\"id\":\"re_1\",\"amount\":999,\"currency\":\"usd\",\"payment_intent\":\"pi_ride\",\"failure_reason\":\"lost_or_stolen_card\"}")
+                .andExpect(status().isOk());
+
+        var reversed = incidentRepo.findByTypeAndProviderRef(IncidentType.TRANSFER_REVERSED, "tr_paid").orElseThrow();
+        assertThat(reversed.getRiderId()).isEqualTo(rider.id());
+        assertThat(reversed.getPayoutId()).isNotNull();                             // tied to the payout our books say was paid
+        assertThat(reversed.getAmount()).isEqualByComparingTo("7.99");
+        var refund = incidentRepo.findByTypeAndProviderRef(IncidentType.REFUND_FAILED, "re_1").orElseThrow();
+        assertThat(refund.getPaymentId()).isEqualTo(payment.getId());
+        assertThat(refund.getDetail()).contains("lost_or_stolen_card");
+
+        JsonNode attention = fetch("/api/admin/finance/attention", admin());
+        assertThat(attention.get("incidents").get("open").asInt()).isEqualTo(2);
+        assertThat(attention.get("incidents").get("byType").get("TRANSFER_REVERSED").asInt()).isEqualTo(1);
+        assertThat(attention.get("incidents").get("byType").get("REFUND_FAILED").asInt()).isEqualTo(1);
+    }
+
     // ---------------------------------------------------------------- late confirmation by webhook
 
     @Test
@@ -402,6 +565,44 @@ class StripeFlowIntegrationTest extends ApiTestBase {
         call(HttpMethod.POST, "/api/riders/me/payout-account/onboarding", r, null).andExpect(status().isOk());
         webhook("account.updated", "{\"id\":\"" + accountId + "\",\"payouts_enabled\":true}").andExpect(status().isOk());
         return r;
+    }
+
+    /** A completed, captured ride on Stripe: customer cus_ravi, rider acct_asha (payouts enabled), charge pi_ride. */
+    private Payment paidRide() throws Exception {
+        Actor customer = stripeCustomer("Ravi", "cus_ravi", "pm_visa");
+        Actor rider = stripeRider("Asha", "acct_asha");
+        stub.reply(CHARGE, 200, StubStripe.paymentIntent("pi_ride", "succeeded"));
+        return awaitPayment(completeRide(customer, rider).tripId(), PaymentStatus.CAPTURED);
+    }
+
+    private Actor riderOf(Payment payment) {
+        var r = riderRepo.findById(payment.getRiderId()).orElseThrow();
+        return new Actor(r.getId(), tokenFor(r.getPhone()), null);
+    }
+
+    private String tokenFor(String phone) {
+        try {
+            return body(call(HttpMethod.POST, "/api/auth/login", (Actor) null,
+                    "{\"phone\":\"" + phone + "\",\"password\":\"password123\"}")).get("accessToken").asText();
+        } catch (Exception e) {
+            throw new IllegalStateException(e);
+        }
+    }
+
+    /** A Stripe dispute object, in the shape Stripe sends it. */
+    private static String dispute(String id, String status, String paymentIntent, Payment p, long feeMinor) {
+        return "{\"id\":\"" + id + "\",\"object\":\"dispute\",\"amount\":" + cents(p.getAmount()) + ",\"currency\":\"usd\","
+                + "\"charge\":\"ch_1\",\"payment_intent\":\"" + paymentIntent + "\",\"reason\":\"fraudulent\",\"status\":\"" + status + "\","
+                + "\"evidence_details\":{\"due_by\":1893456000,\"has_evidence\":false,\"past_due\":false,\"submission_count\":0},"
+                + "\"balance_transactions\":[" + (feeMinor > 0
+                ? "{\"id\":\"txn_1\",\"object\":\"balance_transaction\",\"amount\":-" + cents(p.getAmount()) + ",\"fee\":" + feeMinor
+                  + ",\"net\":-" + (Long.parseLong(cents(p.getAmount())) + feeMinor) + ",\"currency\":\"usd\",\"type\":\"adjustment\"}" : "") + "]}";
+    }
+
+    /** An event for a connected account (Stripe adds the top-level "account"). */
+    private ResultActions webhookFor(String account, String type, String objectJson) throws Exception {
+        String payload = event("evt_" + UUID.randomUUID(), type, objectJson).replaceFirst("\\{", "{\"account\":\"" + account + "\",");
+        return postRaw(payload, sign(payload, System.currentTimeMillis() / 1000, SECRET));
     }
 
     private void setProviderCustomer(Actor customer, String stripeCustomerId) {

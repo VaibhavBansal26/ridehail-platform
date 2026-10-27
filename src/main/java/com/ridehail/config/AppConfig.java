@@ -1,6 +1,7 @@
 package com.ridehail.config;
 
 import com.ridehail.dispatch.DispatchProperties;
+import com.ridehail.dispute.DisputeProperties;
 import com.ridehail.payment.PaymentProperties;
 import com.ridehail.payment.stripe.StripeProperties;
 import com.ridehail.pricing.PricingProperties;
@@ -15,7 +16,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @Configuration
 @EnableScheduling
 @EnableConfigurationProperties({PricingProperties.class, DispatchProperties.class, SecurityProperties.class,
-        PaymentProperties.class, StripeProperties.class, TrackingProperties.class})
+        PaymentProperties.class, StripeProperties.class, TrackingProperties.class, DisputeProperties.class})
 public class AppConfig {
 
     /**

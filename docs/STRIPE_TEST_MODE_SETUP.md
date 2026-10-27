@@ -29,10 +29,12 @@ name below differs slightly, search for the term in italics.
 
   | Endpoint | *Events from* | Events to subscribe |
   |---|---|---|
-  | **A: your account** | **Your account** | `setup_intent.succeeded`, `payment_intent.succeeded`, `balance.available`, `charge.dispute.created`, `refund.failed`*, `transfer.reversed` |
-  | **B: Connect** | **Connected accounts** | `account.updated`, `payout.failed` |
+  | **A: your account** | **Your account** | `setup_intent.succeeded`, `payment_intent.succeeded`, `balance.available`, `charge.dispute.created`, `charge.dispute.updated`, `charge.dispute.closed`, `refund.failed`*, `transfer.reversed` |
+  | **B: Connect** | **Connected accounts** | `account.updated`, `payout.failed`, `account.external_account.created`, `account.external_account.updated` |
 
   \* If `refund.failed` is not in the event list, skip it; refunds still work, you just lose one alert.
+  The `charge.dispute.*` events drive dispute handling (see [DISPUTES.md](DISPUTES.md)): subscribe to all three. A dispute
+  you are not subscribed to is invisible to us, and its deadline to respond keeps running.
   `balance.available` is how a payout that is waiting for card funds to settle gets released the moment Stripe has the money;
   without it the payout is still released, just at the next poll (every 15 minutes by default).
   Set the endpoints' **API version** to the same one the SDK uses (the Dashboard shows the choices; pick the newest),
@@ -380,8 +382,9 @@ You're done when A1–A3, B1, C1–C4, D1–D4, E1–E4, F1, G1 all behaved as s
 - [ ] Run with `SPRING_PROFILES_ACTIVE=prod`. It requires the secrets above plus `JWT_SECRET`, `ADMIN_PASSWORD`,
   `ALLOWED_ORIGINS` and the database settings, and it refuses to start with the simulator.
 - [ ] Database: the `prod` profile runs the Flyway migrations at startup and then validates the schema against the entities.
-- [ ] Alert on the `ERROR`-level log lines for disputes, failed refunds, failed payouts and reversed transfers
-  (`Stripe event … needs manual follow-up`) and on any payment or payout in `REQUIRES_ATTENTION`.
+- [ ] Alert on `GET /api/admin/finance/attention` reporting `needsAction: true` (open chargebacks, open incidents, payments or payouts
+  in `REQUIRES_ATTENTION`), and on the `ERROR`-level log lines `Finance incident …` and `Dispute … cannot match`. A chargeback has a
+  response deadline (`evidenceDueBy`): somebody must respond in the Stripe Dashboard before it, or the dispute is lost by default.
 
 ---
 
@@ -399,5 +402,8 @@ You're done when A1–A3, B1, C1–C4, D1–D4, E1–E4, F1, G1 all behaved as s
 - **Refunds don't claw back from the rider's Stripe account** (no transfer reversal), only in our ledger.
 - **3-D Secure for saved cards.** Off-session charges on cards that demand authentication are declined; there's no flow yet to
   bring the customer back in to authenticate.
-- **Disputes, failed bank payouts and reversed transfers** are logged for a human and not automated.
+- **Disputes are recorded, frozen and settled in the ledger, but not answered.** We do not submit evidence to Stripe; an admin
+  does that in the Stripe Dashboard before the deadline (the admin API gives the link). Reversed transfers and failed refunds are
+  raised as incidents for a person; we do not repair the books automatically. See [DISPUTES.md](DISPUTES.md) for the details and
+  what is deliberately left manual.
 - **Not covered by any automated test:** the real Stripe network. Everything above exists to cover that.

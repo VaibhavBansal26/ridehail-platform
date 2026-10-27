@@ -81,6 +81,18 @@ public class Payment {
         status = PaymentStatus.PENDING;
     }
 
+    public void markDisputed() {
+        if (status == PaymentStatus.CAPTURED) status = PaymentStatus.DISPUTED;
+    }
+
+    public void markDisputeWon() {
+        if (status == PaymentStatus.DISPUTED) status = PaymentStatus.CAPTURED;
+    }
+
+    public void markChargedBack() {
+        if (status == PaymentStatus.DISPUTED) status = PaymentStatus.CHARGED_BACK;
+    }
+
     void refunded(Instant now) {
         status = PaymentStatus.REFUNDED;
         refundedAt = now;

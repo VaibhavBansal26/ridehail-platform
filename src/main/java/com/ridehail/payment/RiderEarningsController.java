@@ -2,6 +2,7 @@ package com.ridehail.payment;
 
 import com.ridehail.common.ApiExceptions.ForbiddenException;
 import com.ridehail.common.ApiExceptions.NotFoundException;
+import com.ridehail.dispute.IncidentService;
 import com.ridehail.ledger.Direction;
 import com.ridehail.ledger.LedgerService;
 import com.ridehail.ledger.TxKind;
@@ -36,12 +37,14 @@ class RiderEarningsController {
     private final PayoutRepository payouts;
     private final PricingProperties pricing;
     private final OnboardingGateway onboarding;
+    private final IncidentService incidents;
     private final TransactionTemplate tx;
 
     RiderEarningsController(RiderRepository riders, LedgerService ledger, PayoutService payoutService,
                             PayoutRepository payouts, PricingProperties pricing, OnboardingGateway onboarding,
-                            TransactionTemplate tx) {
+                            IncidentService incidents, TransactionTemplate tx) {
         this.onboarding = onboarding;
+        this.incidents = incidents;
         this.tx = tx;
         this.riders = riders;
         this.ledger = ledger;
@@ -61,8 +64,13 @@ class RiderEarningsController {
         }
     }
     record LedgerLine(Instant at, Direction direction, BigDecimal amount, TxKind kind, String description) {}
-    record Earnings(BigDecimal available, BigDecimal payoutsInProgress, String currency, boolean hasPayoutAccount,
-                    List<LedgerLine> recent) {}
+    /**
+     * @param onHold               earnings frozen while a payment dispute is decided (not payable yet; released or, depending on
+     *                             policy, taken back when it is). May be shown to the rider without any customer detail.
+     * @param payoutBlockedReason  why withdrawals are currently refused, if they are (e.g. the bank rejected the last payout)
+     */
+    record Earnings(BigDecimal available, BigDecimal onHold, BigDecimal payoutsInProgress, String currency, boolean hasPayoutAccount,
+                    String payoutBlockedReason, List<LedgerLine> recent) {}
 
     /**
      * Starts payout onboarding with a real provider: the rider opens the returned URL to give their identity and
@@ -100,7 +108,9 @@ class RiderEarningsController {
                 .stream().map(Payout::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
         var recent = ledger.recent(account).stream()
                 .map(e -> new LedgerLine(e.at(), e.direction(), e.amount(), e.kind(), e.description())).toList();
-        return new Earnings(ledger.balance(account), inProgress, pricing.currency(), rider.getPayoutAccountToken() != null, recent);
+        String blocked = incidents.hasOpenBankIssue(id) ? "Your bank rejected the last payout. Update your bank details to withdraw again." : null;
+        return new Earnings(ledger.balance(account), ledger.riderHeldBalance(id), inProgress, pricing.currency(),
+                rider.getPayoutAccountToken() != null, blocked, recent);
     }
 
     private com.ridehail.rider.Rider findRider(UUID id) {
