@@ -28,6 +28,7 @@ class SecurityConfig {
             .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
             .authorizeHttpRequests(a -> a
                 .requestMatchers("/api/auth/**", "/actuator/health/**", "/actuator/info").permitAll()
+                .requestMatchers("/actuator/**").hasRole("ADMIN") // metrics etc. describe the system: ops only (health/info are open above)
                 .requestMatchers("/api/webhooks/**").permitAll() // authenticated by the provider's signature, not a JWT
                 .requestMatchers("/ws/**").permitAll() // handshake is open; the STOMP CONNECT frame must carry a JWT
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")

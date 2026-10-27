@@ -1,5 +1,5 @@
-# Postgres + Flyway with the simulated payment gateway and dev secrets: for `docker compose up` and local runs
-# against a real database. Not for production (use the "prod" profile, which needs real secrets).
+# Postgres + Flyway, RabbitMQ realtime relay and Redis rate limiting, with the simulated payment gateway and dev secrets:
+# for `docker compose up` (two instances). Not for production (use the "prod" profile, which needs real secrets).
 spring:
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/ridehail}
@@ -10,3 +10,9 @@ spring:
       ddl-auto: validate
   flyway:
     enabled: true
+
+ridehail:
+  realtime:
+    broker: relay
+  ratelimit:
+    store: redis

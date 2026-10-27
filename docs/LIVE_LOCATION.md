@@ -3,7 +3,7 @@
 While a rider is on its way to a customer, or driving them, the customer's app sees the rider moving on the map.
 
 ```
-rider app ──PUT /api/riders/me/location──▶ server ──WebSocket /user/queue/location──▶ customer app
+rider app ──PUT /api/riders/me/location──▶ server ──WebSocket /user/topic/location──▶ customer app
               (every few seconds)           │  looks up the rider's active trip
                                             │  and sends ONLY to that trip's customer
 ```
@@ -30,7 +30,7 @@ Limits are per application instance and configurable (`ridehail.tracking.*`).
 ## Customer app: receive it
 
 1. Connect to `/ws` with `Authorization: Bearer <access token>` (as for every other feed).
-2. Subscribe to `/user/queue/location`. **Customers only**: a rider (or anyone else) who tries is disconnected.
+2. Subscribe to `/user/topic/location`. **Customers only**: a rider (or anyone else) who tries is disconnected.
 3. You receive one message per push:
 
 ```json
@@ -65,10 +65,10 @@ Limits are per application instance and configurable (`ridehail.tracking.*`).
 
 ## Operating notes
 
-- The WebSocket broker is in-memory, so a push reaches the customer only if they are connected to the same instance that
-  received the rider's update. Run several instances behind a STOMP broker relay (RabbitMQ) before scaling out; the same
-  applies to the offer and trip-update feeds.
-- Rate limits are per instance too. A strict global limit would need a shared store such as Redis.
+- With several instances, set `ridehail.realtime.broker=relay` (RabbitMQ) and `ridehail.ratelimit.store=redis`. Then a push reaches
+  the customer whichever instance they are connected to, and the rider's allowance and the per-trip push interval are shared by
+  all instances (one rider's updates may be spread over several). See [SCALING.md](SCALING.md).
+- Each rider update still costs two small queries; at large scale, move live positions to Redis and keep the database for the last-known position.
 - Each rider update costs two small queries (the rider row, then the active-trip lookup). At large scale, move live positions
   to Redis/streams and keep the database for the last-known position only.
 - Not implemented: rejecting physically impossible jumps (GPS spoofing), and per-customer subscription rate limits.

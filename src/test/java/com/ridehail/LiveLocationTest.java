@@ -33,7 +33,7 @@ import org.springframework.test.web.servlet.ResultActions;
         "spring.datasource.url=jdbc:h2:mem:live-location;MODE=PostgreSQL;DB_CLOSE_DELAY=-1"})
 class LiveLocationTest extends ApiTestBase {
 
-    static final String FEED = "/queue/location";
+    static final String FEED = "/topic/location";
 
     @SpyBean SimpMessagingTemplate ws;
     @Autowired com.ridehail.tracking.LocationRateLimiter limiter;

@@ -15,6 +15,17 @@ ridehail:
     allowed-origins: ${ALLOWED_ORIGINS}  # comma-separated, e.g. https://admin.example.com
     bootstrap-admin:
       password: ${ADMIN_PASSWORD}
+  realtime:
+    broker: ${REALTIME_BROKER:relay}       # relay = RabbitMQ, required when more than one instance runs
+    relay:
+      host: ${RABBITMQ_HOST:}              # no usable defaults: with broker=relay, startup fails naming what is missing
+      virtual-host: ${RABBITMQ_VHOST:/}
+      system-login: ${RABBITMQ_USER:}
+      system-passcode: ${RABBITMQ_PASSWORD:}
+      client-login: ${RABBITMQ_USER:}
+      client-passcode: ${RABBITMQ_PASSWORD:}
+  ratelimit:
+    store: ${RATELIMIT_STORE:redis}        # redis = limits shared by every instance (REDIS_HOST, REDIS_PASSWORD)
   payments:
     gateway: stripe   # the simulated gateway never loads in prod
   stripe:

@@ -20,17 +20,17 @@ import org.springframework.transaction.event.TransactionalEventListener;
 /**
  * Turns domain events into WebSocket pushes, only after the database transaction has committed,
  * so a client is never told about something that was rolled back.
- *   riders    <- /user/queue/offers : OFFER_RECEIVED, OFFER_EXPIRED, OFFER_WITHDRAWN
- *   customers <- /user/queue/trips  : TRIP_REQUESTED, TRIP_ACCEPTED, RIDER_ARRIVED, TRIP_STARTED,
+ *   riders    <- /user/topic/offers : OFFER_RECEIVED, OFFER_EXPIRED, OFFER_WITHDRAWN
+ *   customers <- /user/topic/trips  : TRIP_REQUESTED, TRIP_ACCEPTED, RIDER_ARRIVED, TRIP_STARTED,
  *                                     TRIP_COMPLETED, TRIP_CANCELLED, NO_RIDERS_AVAILABLE
- *   riders    <- /user/queue/trips  : TRIP_CANCELLED
+ *   riders    <- /user/topic/trips  : TRIP_CANCELLED
  * REST stays the source of truth: a client that reconnects should re-fetch state, since pushes are best-effort.
  */
 @Component
 class RideEventPushListener {
     private static final Logger log = LoggerFactory.getLogger(RideEventPushListener.class);
-    private static final String OFFERS = "/queue/offers";
-    private static final String TRIPS = "/queue/trips";
+    private static final String OFFERS = Destinations.OFFERS;
+    private static final String TRIPS = Destinations.TRIPS;
 
     private final SimpMessagingTemplate ws;
     private final TripRepository trips;

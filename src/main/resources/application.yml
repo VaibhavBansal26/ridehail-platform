@@ -12,7 +12,19 @@ spring:
   flyway:
     enabled: false   # dev/tests use in-memory H2 with generated tables; Postgres profiles turn migrations on
 
+  data:
+    redis:
+      # only used when ridehail.ratelimit.store=redis; short timeouts so a slow Redis can never slow a request down
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      timeout: 200ms
+      connect-timeout: 500ms
+
 management:
+  health:
+    redis:
+      enabled: false   # a Redis outage must not mark an instance unhealthy: rate limiting degrades to per-instance by itself
   endpoints:
     web:
       exposure:
@@ -68,6 +80,19 @@ ridehail:
     retry-scan-ms: 5000
   disputes:
     loss-policy: platform   # who absorbs a dispute we lose: platform (rider keeps earnings) | rider (rider's share is taken back)
+  realtime:
+    broker: simple       # simple | relay. Use relay (RabbitMQ) whenever more than one instance runs.
+    relay:               # used only when broker=relay; RabbitMQ with the rabbitmq_stomp plugin
+      host: ${RABBITMQ_HOST:localhost}
+      port: ${RABBITMQ_STOMP_PORT:61613}
+      virtual-host: ${RABBITMQ_VHOST:/}
+      system-login: ${RABBITMQ_USER:ridehail}
+      system-passcode: ${RABBITMQ_PASSWORD:ridehail}
+      client-login: ${RABBITMQ_USER:ridehail}
+      client-passcode: ${RABBITMQ_PASSWORD:ridehail}
+  ratelimit:
+    store: memory        # memory | redis. Use redis whenever more than one instance runs.
+    redis-cool-off: 5s   # after a Redis failure, use local counters for this long before trying Redis again
   tracking:
     location-updates-per-second: 1.0   # sustained rate a rider app may report its position
     location-burst: 5                  # short bursts allowed above that

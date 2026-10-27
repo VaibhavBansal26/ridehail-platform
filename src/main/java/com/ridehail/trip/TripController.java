@@ -45,7 +45,7 @@ class TripController {
         return TripResponse.of(trips.getFor(id, CurrentUser.profileId(jwt), CurrentUser.role(jwt) == Role.ADMIN));
     }
 
-    /** Last known position of the trip's rider; the live feed (WebSocket /user/queue/location) keeps it fresh after this. */
+    /** Last known position of the trip's rider; the live feed (WebSocket /user/topic/location) keeps it fresh after this. */
     @GetMapping("/{id}/rider-location")
     TripService.RiderPosition riderLocation(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
         return trips.riderPosition(id, CurrentUser.profileId(jwt), CurrentUser.role(jwt) == Role.ADMIN);

@@ -1,11 +1,11 @@
 package com.ridehail.tracking;
 
 import com.ridehail.common.RiderLocationUpdated;
-import com.ridehail.common.TokenBucketLimiter;
+import com.ridehail.common.RateLimiter;
+import com.ridehail.ratelimit.RateLimiterFactory;
 import com.ridehail.trip.Trip;
 import com.ridehail.trip.TripRepository;
 import com.ridehail.trip.TripStatus;
-import java.time.Clock;
 import java.util.EnumSet;
 import java.util.LinkedHashMap;
 import java.util.UUID;
@@ -17,7 +17,7 @@ import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 
 /**
- * Sends a rider's position to the customer whose trip the rider is currently serving, on /user/queue/location.
+ * Sends a rider's position to the customer whose trip the rider is currently serving, on /user/topic/location.
  *
  * Who may see a rider's position is decided here, on the server, never by the client:
  *  - the recipient is looked up from the database as the customer of the rider's ACTIVE trip (accepted, arrived or
@@ -30,25 +30,26 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @Component
 class LiveLocationPusher {
     private static final Logger log = LoggerFactory.getLogger(LiveLocationPusher.class);
-    static final String DESTINATION = "/queue/location";
+    static final String DESTINATION = com.ridehail.push.Destinations.LOCATION;
     private static final EnumSet<TripStatus> SHARING = EnumSet.of(TripStatus.ACCEPTED, TripStatus.ARRIVED, TripStatus.IN_PROGRESS);
 
     private final SimpMessagingTemplate ws;
     private final TripRepository trips;
-    private final TokenBucketLimiter<UUID> perTrip;
+    private final RateLimiter perTrip;
 
-    LiveLocationPusher(SimpMessagingTemplate ws, TripRepository trips, TrackingProperties props, Clock clock) {
+    LiveLocationPusher(SimpMessagingTemplate ws, TripRepository trips, TrackingProperties props, RateLimiterFactory limiters) {
         this.ws = ws;
         this.trips = trips;
         // one position per interval per trip, no bursting: bucket of 1 that refills once per interval
-        this.perTrip = new TokenBucketLimiter<>(1000.0 / Math.max(1, props.pushMinIntervalMs()), 1, clock);
+        // shared across instances too, or two servers handling one rider's updates would each push once per interval
+        this.perTrip = limiters.create("location-push", 1000.0 / Math.max(1, props.pushMinIntervalMs()), 1);
     }
 
     @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
     void on(RiderLocationUpdated e) {
         try {
             Trip trip = trips.findFirstByRiderIdAndStatusIn(e.riderId(), SHARING).orElse(null);
-            if (trip == null || !perTrip.tryAcquire(trip.getId()).allowed()) return;
+            if (trip == null || !perTrip.tryAcquire(trip.getId().toString()).allowed()) return;
 
             var msg = new LinkedHashMap<String, Object>();
             msg.put("type", "RIDER_LOCATION");

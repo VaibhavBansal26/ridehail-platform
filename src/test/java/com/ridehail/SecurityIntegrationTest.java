@@ -119,6 +119,20 @@ class SecurityIntegrationTest extends ApiTestBase {
     }
 
     @Test
+    void operationalEndpointsAreForAdminsOnlyWhileHealthStaysOpenForLoadBalancers() throws Exception {
+        Actor customer = customer("Ravi");
+        Actor rider = onlineRider("Asha", 0.005);
+
+        callWithToken(HttpMethod.GET, "/actuator/health", null, null).andExpect(status().isOk());
+        callWithToken(HttpMethod.GET, "/actuator/info", null, null).andExpect(status().isOk());
+
+        callWithToken(HttpMethod.GET, "/actuator/metrics", null, null).andExpect(status().isUnauthorized());
+        call(HttpMethod.GET, "/actuator/metrics", customer, null).andExpect(status().isForbidden());
+        call(HttpMethod.GET, "/actuator/metrics/jvm.memory.used", rider, null).andExpect(status().isForbidden());
+        call(HttpMethod.GET, "/actuator/metrics", admin(), null).andExpect(status().isOk());
+    }
+
+    @Test
     void tokenSignedWithAnotherKeyIsRejected() throws Exception {
         Actor customer = customer("Ravi");
         String[] parts = customer.token().split("\\.");

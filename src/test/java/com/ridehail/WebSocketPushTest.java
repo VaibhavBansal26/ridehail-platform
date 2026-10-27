@@ -91,9 +91,9 @@ class WebSocketPushTest {
         User customer = register("customer", null);
 
         var riderSocket = connect(rider.token());
-        var riderOffers = subscribe(riderSocket, "/user/queue/offers");
-        var riderTrips = subscribe(riderSocket, "/user/queue/trips");
-        var customerTrips = subscribe(connect(customer.token()), "/user/queue/trips");
+        var riderOffers = subscribe(riderSocket, "/user/topic/offers");
+        var riderTrips = subscribe(riderSocket, "/user/topic/trips");
+        var customerTrips = subscribe(connect(customer.token()), "/user/topic/trips");
 
         rest("/api/riders/me/online", rider.token(), Map.of("lat", PICKUP_LAT + 0.005, "lon", PICKUP_LON));
         JsonNode quote = rest("/api/fares/quote", customer.token(), Map.of("vehicleType", "SEDAN",
@@ -133,7 +133,7 @@ class WebSocketPushTest {
     void cancellationWithdrawsThePendingOfferFromTheRider() throws Exception {
         User rider = register("rider", "SEDAN");
         User customer = register("customer", null);
-        var riderOffers = subscribe(connect(rider.token()), "/user/queue/offers");
+        var riderOffers = subscribe(connect(rider.token()), "/user/topic/offers");
 
         rest("/api/riders/me/online", rider.token(), Map.of("lat", PICKUP_LAT + 0.005, "lon", PICKUP_LON));
         JsonNode quote = rest("/api/fares/quote", customer.token(), Map.of("vehicleType", "SEDAN",
@@ -154,9 +154,9 @@ class WebSocketPushTest {
         User bystanderCustomer = register("bystander", null);
         User bystanderRider = register("bystander-rider", "SEDAN");
 
-        var bystanderTrips = subscribe(connect(bystanderCustomer.token()), "/user/queue/trips");
-        var bystanderOffers = subscribe(connect(bystanderRider.token()), "/user/queue/offers");
-        var riderOffers = subscribe(connect(rider.token()), "/user/queue/offers");
+        var bystanderTrips = subscribe(connect(bystanderCustomer.token()), "/user/topic/trips");
+        var bystanderOffers = subscribe(connect(bystanderRider.token()), "/user/topic/offers");
+        var riderOffers = subscribe(connect(rider.token()), "/user/topic/offers");
 
         rest("/api/riders/me/online", rider.token(), Map.of("lat", PICKUP_LAT + 0.005, "lon", PICKUP_LON));
         JsonNode quote = rest("/api/fares/quote", customer.token(), Map.of("vehicleType", "SEDAN",
@@ -175,10 +175,10 @@ class WebSocketPushTest {
         User stranger = register("stranger", null);
 
         var customerSocket = connect(customer.token());
-        var customerFeed = subscribe(customerSocket, "/user/queue/location");
-        var customerTrips = subscribe(customerSocket, "/user/queue/trips");
-        var strangerFeed = subscribe(connect(stranger.token()), "/user/queue/location");
-        var riderOffers = subscribe(connect(rider.token()), "/user/queue/offers");   // before the offer goes out
+        var customerFeed = subscribe(customerSocket, "/user/topic/location");
+        var customerTrips = subscribe(customerSocket, "/user/topic/trips");
+        var strangerFeed = subscribe(connect(stranger.token()), "/user/topic/location");
+        var riderOffers = subscribe(connect(rider.token()), "/user/topic/offers");   // before the offer goes out
 
         rest("/api/riders/me/online", rider.token(), Map.of("lat", PICKUP_LAT + 0.005, "lon", PICKUP_LON));
         JsonNode quote = rest("/api/fares/quote", customer.token(), Map.of("vehicleType", "SEDAN",
@@ -215,9 +215,9 @@ class WebSocketPushTest {
         User rider = register("rider", "SEDAN");
         User customer = register("customer", null);
         var riderSocket = connect(rider.token());
-        var riderOffers = subscribe(riderSocket, "/user/queue/offers");
-        var riderTrips = subscribe(riderSocket, "/user/queue/trips");
-        var customerTrips = subscribe(connect(customer.token()), "/user/queue/trips");
+        var riderOffers = subscribe(riderSocket, "/user/topic/offers");
+        var riderTrips = subscribe(riderSocket, "/user/topic/trips");
+        var customerTrips = subscribe(connect(customer.token()), "/user/topic/trips");
 
         rest("/api/riders/me/online", rider.token(), Map.of("lat", PICKUP_LAT + 0.005, "lon", PICKUP_LON));
         JsonNode quote = rest("/api/fares/quote", customer.token(), Map.of("vehicleType", "SEDAN",
@@ -257,11 +257,11 @@ class WebSocketPushTest {
 
         // a rider asking for the customer's location feed is refused and disconnected
         StompSession s = connect(rider.token());
-        s.subscribe("/user/queue/location", handler(new LinkedBlockingQueue<>()));
+        s.subscribe("/user/topic/location", handler(new LinkedBlockingQueue<>()));
         awaitDisconnected(s);
         // while a customer may
         StompSession ok = connect(customer.token());
-        ok.subscribe("/user/queue/location", handler(new LinkedBlockingQueue<>()));
+        ok.subscribe("/user/topic/location", handler(new LinkedBlockingQueue<>()));
         Thread.sleep(500);
         assertThat(ok.isConnected()).isTrue();
     }
@@ -283,12 +283,12 @@ class WebSocketPushTest {
 
         // a customer may not listen to rider offers; the server closes the session
         StompSession s = connect(customer.token());
-        s.subscribe("/user/queue/offers", handler(new LinkedBlockingQueue<>()));
+        s.subscribe("/user/topic/offers", handler(new LinkedBlockingQueue<>()));
         awaitDisconnected(s);
 
         // nobody may subscribe to arbitrary topics
         StompSession s2 = connect(customer.token());
-        s2.subscribe("/queue/trips", handler(new LinkedBlockingQueue<>()));
+        s2.subscribe("/topic/trips", handler(new LinkedBlockingQueue<>()));
         awaitDisconnected(s2);
     }
 
@@ -296,7 +296,7 @@ class WebSocketPushTest {
     void clientsCannotSendMessagesThroughTheSocket() throws Exception {
         User customer = register("customer", null);
         StompSession s = connect(customer.token());
-        s.send("/queue/trips", "spoof");
+        s.send("/topic/trips", "spoof");
         awaitDisconnected(s);
     }
 

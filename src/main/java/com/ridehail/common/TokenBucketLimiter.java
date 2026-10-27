@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicInteger;
  */
 public final class TokenBucketLimiter<K> {
 
-    public record Decision(boolean allowed, long retryAfterMillis) {}
+    private static final RateLimiter.Decision ALLOWED = RateLimiter.Decision.allow();
 
     private static final class Bucket {
         double tokens;
@@ -42,19 +42,19 @@ public final class TokenBucketLimiter<K> {
         this.clock = clock;
     }
 
-    public Decision tryAcquire(K key) {
+    public RateLimiter.Decision tryAcquire(K key) {
         long now = clock.instant().toEpochMilli();
         Bucket bucket = buckets.computeIfAbsent(key, k -> new Bucket(burst, now));
-        Decision decision;
+        RateLimiter.Decision decision;
         synchronized (bucket) {
             long elapsed = Math.max(0, now - bucket.lastMillis);
             bucket.tokens = Math.min(burst, bucket.tokens + elapsed * refillPerMilli);
             bucket.lastMillis = now;
             if (bucket.tokens >= 1.0) {
                 bucket.tokens -= 1.0;
-                decision = new Decision(true, 0);
+                decision = ALLOWED;
             } else {
-                decision = new Decision(false, (long) Math.ceil((1.0 - bucket.tokens) / refillPerMilli));
+                decision = RateLimiter.Decision.deny((long) Math.ceil((1.0 - bucket.tokens) / refillPerMilli));
             }
         }
         if (calls.incrementAndGet() % CLEANUP_EVERY_CALLS == 0) evictIdle(now);

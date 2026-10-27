@@ -10,7 +10,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 /**
- * The rider gets offers pushed over WebSocket (/user/queue/offers); this lists whatever is still pending
+ * The rider gets offers pushed over WebSocket (/user/topic/offers); this lists whatever is still pending
  * (e.g. after reconnecting) and is where the rider accepts or declines.
  */
 @RestController
