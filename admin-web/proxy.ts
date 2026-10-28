@@ -61,7 +61,7 @@ export const config = {
   matcher: [
     // everything except the API routes (they authenticate themselves), static files and prefetches
     {
-      source: "/((?!api|_next/static|_next/image|favicon.ico).*)",
+      source: "/((?!api|_next/static|_next/image|favicon.ico|robots.txt).*)",
       missing: [
         { type: "header", key: "next-router-prefetch" },
         { type: "header", key: "purpose", value: "prefetch" },
