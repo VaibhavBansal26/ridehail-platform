@@ -1,0 +1,22 @@
+{
+  "needsAction" : true,
+  "disputes" : {
+    "open" : 2,
+    "inquiries" : 1,
+    "openAmount" : 22.46,
+    "overdue" : 1,
+    "earliestEvidenceDueBy" : "2026-10-27T06:33:18.804735Z"
+  },
+  "incidents" : {
+    "open" : 3,
+    "byType" : {
+      "CONNECT_PAYOUT_FAILED" : 1,
+      "TRANSFER_REVERSED" : 1,
+      "REFUND_FAILED" : 1
+    }
+  },
+  "paymentsRequiringAttention" : 0,
+  "payoutsRequiringAttention" : 0,
+  "payoutsAwaitingFunds" : 0,
+  "riderFundsOnHold" : 17.97
+}

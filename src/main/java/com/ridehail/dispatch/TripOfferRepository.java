@@ -13,6 +13,8 @@ public interface TripOfferRepository extends JpaRepository<TripOffer, UUID> {
 
     List<TripOffer> findByTripIdAndStatus(UUID tripId, OfferStatus status);
 
+    List<TripOffer> findByTripIdOrderByCreatedAtAsc(UUID tripId);
+
     List<TripOffer> findByStatusAndExpiresAtBefore(OfferStatus status, Instant cutoff);
 
     @Query("select o.riderId from TripOffer o where o.tripId = :tripId")

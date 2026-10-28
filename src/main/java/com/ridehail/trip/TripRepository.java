@@ -15,5 +15,10 @@ public interface TripRepository extends JpaRepository<Trip, UUID> {
 
     Page<Trip> findByStatus(TripStatus status, Pageable pageable);
 
+    /** Trips in any of these states, capped by the page size (used by the live ops map). */
+    java.util.List<Trip> findByStatusIn(Collection<TripStatus> statuses, Pageable pageable);
+
+    long countByStatus(TripStatus status);
+
     boolean existsByCustomerIdAndStatusIn(UUID customerId, Collection<TripStatus> statuses);
 }

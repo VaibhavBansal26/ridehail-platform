@@ -1,0 +1,17 @@
+{
+  "items": [
+    {
+      "id": "7a1f3c52-2c58-4b6e-9a53-5f0d1d6f7a01",
+      "riderId": "425f545d-e272-43d0-8971-d6e1dbc4fcf8",
+      "amount": 25.5,
+      "status": "AWAITING_FUNDS",
+      "attempts": 0,
+      "failureReason": null,
+      "waitingSince": "2026-10-28T06:25:30.709922Z",
+      "createdAt": "2026-10-28T06:25:30.709922Z"
+    }
+  ],
+  "total": 1,
+  "page": 0,
+  "size": 20
+}

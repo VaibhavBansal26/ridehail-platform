@@ -1,0 +1,39 @@
+{
+  "byType" : {
+    "CASH" : {
+      "debits" : 476.65,
+      "credits" : 81.78
+    },
+    "RIDER_PAYABLE" : {
+      "debits" : 53.42,
+      "credits" : 396.89
+    },
+    "PAYOUTS_IN_TRANSIT" : {
+      "debits" : 0,
+      "credits" : 0
+    },
+    "COMMISSION_REVENUE" : {
+      "debits" : 0,
+      "credits" : 90.38
+    },
+    "RIDER_FUNDS_HELD" : {
+      "debits" : 35.45,
+      "credits" : 53.42
+    },
+    "DISPUTES_IN_PROGRESS" : {
+      "debits" : 66.78,
+      "credits" : 44.32
+    },
+    "DISPUTE_LOSSES" : {
+      "debits" : 19.49,
+      "credits" : 0
+    },
+    "DISPUTE_FEES" : {
+      "debits" : 15.0,
+      "credits" : 0
+    }
+  },
+  "totalDebits" : 666.79,
+  "totalCredits" : 666.79,
+  "balanced" : true
+}

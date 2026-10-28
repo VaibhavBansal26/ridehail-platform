@@ -3,6 +3,8 @@
 #
 #   http://localhost:8080  gateway (nginx): spreads REST and WebSocket connections over both instances
 #   http://localhost:8081  instance A directly      http://localhost:8082  instance B directly   (loopback only)
+#   http://localhost:3000  admin web panel (sign in as "admin" with ADMIN_PASSWORD, dev default: dev-admin-password)
+#                          DEMO_DATA=true docker compose up --build   loads a demo city so the panel has something to show
 #
 # Postgres is the system of record. RabbitMQ (STOMP) carries realtime pushes between instances, so a user connected to B is
 # reached by something that happens on A. Redis holds the rate-limit counters so limits hold across both. RabbitMQ and Redis
@@ -24,7 +26,7 @@ x-app: &app
     default:
       aliases:
         - app            # every instance answers to "app"; the gateway balances across whatever is running
-  environment:
+  environment: &app-env
     SPRING_PROFILES_ACTIVE: docker
     DB_URL: jdbc:postgresql://postgres:5432/ridehail
     DB_USER: ridehail
@@ -79,6 +81,11 @@ services:
 
   app-a:
     <<: *app
+    environment:
+      <<: *app-env
+      # DEMO_DATA=true fills the database with a believable city for the admin panel. Only this instance does it: two
+      # instances starting together on an empty database would both try.
+      RIDEHAIL_DEMO_DATA_ENABLED: ${DEMO_DATA:-false}
     ports:
       - "127.0.0.1:${APP_A_PORT:-8081}:8080"
 
@@ -103,6 +110,19 @@ services:
       retries: 20
     ports:
       - "${APP_PORT:-8080}:80"
+
+  # The operations console. It talks to the API through the gateway, server to server; the browser only ever talks to it.
+  admin:
+    build: ./admin-web
+    image: ridehail-admin-web:compose
+    depends_on:
+      gateway:
+        condition: service_healthy
+    environment:
+      BACKEND_URL: http://gateway
+      ALLOW_INSECURE_COOKIES: "true"     # this stack is served over plain http on localhost; production must leave this unset
+    ports:
+      - "127.0.0.1:${ADMIN_PORT:-3000}:3000"
 
 volumes:
   pgdata:

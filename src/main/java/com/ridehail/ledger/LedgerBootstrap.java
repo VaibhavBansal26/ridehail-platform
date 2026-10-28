@@ -3,6 +3,7 @@ package com.ridehail.ledger;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 /**
@@ -12,6 +13,7 @@ import org.springframework.stereotype.Component;
  * database allows only one. The loser's transaction is rolled back, so it simply asks again: the accounts now exist.
  */
 @Component
+@Order(0)   // before anything that posts to the ledger at startup (the demo data seeder)
 class LedgerBootstrap implements ApplicationRunner {
     private final LedgerService ledger;
 

@@ -15,6 +15,11 @@ public interface RiderRepository extends JpaRepository<Rider, UUID> {
 
     Page<Rider> findByStatus(RiderStatus status, Pageable pageable);
 
+    /** Riders in any of these states, capped by the page size (used by the live ops map). */
+    List<Rider> findByStatusIn(java.util.Collection<RiderStatus> statuses, Pageable pageable);
+
+    long countByStatus(RiderStatus status);
+
     @Query("""
             select r from Rider r
             where r.status = :status and r.vehicleType = :type

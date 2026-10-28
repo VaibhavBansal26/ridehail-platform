@@ -1,0 +1,45 @@
+{
+  "generatedAt" : "2026-10-28T06:33:00.543429Z",
+  "riders" : [ {
+    "id" : "c6e4e865-80d5-4390-8a3b-256e2d48b86e",
+    "name" : "Dan",
+    "vehicleType" : "SEDAN",
+    "status" : "AVAILABLE",
+    "lat" : 12.973600000000001,
+    "lon" : 77.5946,
+    "locationUpdatedAt" : "2026-10-28T06:33:00.543429Z"
+  }, {
+    "id" : "d71c31d6-68ef-4c9c-b7e3-c2dbf2407545",
+    "name" : "Bob",
+    "vehicleType" : "SEDAN",
+    "status" : "AVAILABLE",
+    "lat" : 12.9726,
+    "lon" : 77.5946,
+    "locationUpdatedAt" : "2026-10-28T06:33:00.543429Z"
+  } ],
+  "trips" : [ {
+    "id" : "5c206b35-57ef-4121-a74c-4c276daf78b4",
+    "status" : "REQUESTED",
+    "vehicleType" : "SEDAN",
+    "customerName" : "Carol",
+    "riderName" : null,
+    "riderId" : null,
+    "pickupLat" : 12.9716,
+    "pickupLon" : 77.5946,
+    "dropLat" : 12.9352,
+    "dropLon" : 77.6245,
+    "requestedAt" : "2026-10-28T06:33:00.543429Z"
+  } ],
+  "riderCounts" : {
+    "OFFLINE" : 0,
+    "AVAILABLE" : 2,
+    "ON_TRIP" : 0
+  },
+  "tripCounts" : {
+    "REQUESTED" : 1,
+    "ACCEPTED" : 0,
+    "ARRIVED" : 0,
+    "IN_PROGRESS" : 0
+  },
+  "truncated" : false
+}

@@ -1,0 +1,62 @@
+{
+  "items" : [ {
+    "id" : "0b43d108-a2c8-4440-a7b5-c6704697ce61",
+    "type" : "PLATFORM_PAYOUT_FAILED",
+    "providerRef" : "po_demo_platform",
+    "status" : "RESOLVED",
+    "riderId" : null,
+    "paymentId" : null,
+    "payoutId" : null,
+    "amount" : 1200.0,
+    "currency" : "USD",
+    "detail" : "Platform bank account details were out of date",
+    "createdAt" : "2026-10-28T06:33:19.133839Z",
+    "resolvedAt" : "2026-10-28T06:33:19.160051Z",
+    "resolutionNote" : "Bank details updated; payout re-sent"
+  }, {
+    "id" : "c193d6f2-9c81-4127-a6b3-1febcf444645",
+    "type" : "TRANSFER_REVERSED",
+    "providerRef" : "tr_demo_reversed",
+    "status" : "OPEN",
+    "riderId" : "b7dddf17-783a-466c-89b6-17e46de9946b",
+    "paymentId" : null,
+    "payoutId" : null,
+    "amount" : 18.0,
+    "currency" : "USD",
+    "detail" : "Transfer reversed by the provider",
+    "createdAt" : "2026-10-28T06:33:19.131021Z",
+    "resolvedAt" : null,
+    "resolutionNote" : null
+  }, {
+    "id" : "aa10323c-db80-4929-aa78-405b5b647c4c",
+    "type" : "REFUND_FAILED",
+    "providerRef" : "re_demo_failed",
+    "status" : "OPEN",
+    "riderId" : "d09edbdc-28ae-457d-aac5-8647da2d1ab2",
+    "paymentId" : "11f8281c-9d30-48a8-bf05-1255bbe2eecb",
+    "payoutId" : null,
+    "amount" : 45.08,
+    "currency" : "USD",
+    "detail" : "Refund failed: the card has been closed",
+    "createdAt" : "2026-10-28T06:33:19.129452Z",
+    "resolvedAt" : null,
+    "resolutionNote" : null
+  }, {
+    "id" : "42370be9-e869-4802-b886-4eb8fab0c4c1",
+    "type" : "CONNECT_PAYOUT_FAILED",
+    "providerRef" : "po_demo_failed",
+    "status" : "OPEN",
+    "riderId" : "31cf1c7d-8280-4652-975b-76f2115adfec",
+    "paymentId" : null,
+    "payoutId" : null,
+    "amount" : 42.5,
+    "currency" : "USD",
+    "detail" : "The bank rejected the payout: account closed",
+    "createdAt" : "2026-10-28T06:33:19.118856Z",
+    "resolvedAt" : null,
+    "resolutionNote" : null
+  } ],
+  "total" : 4,
+  "page" : 0,
+  "size" : 20
+}

@@ -1,0 +1,24 @@
+{
+  "items" : [ {
+    "id" : "d71c31d6-68ef-4c9c-b7e3-c2dbf2407545",
+    "name" : "Bob",
+    "vehicleType" : "SEDAN",
+    "status" : "AVAILABLE",
+    "lat" : 12.9726,
+    "lon" : 77.5946,
+    "rating" : 5.0,
+    "locationUpdatedAt" : "2026-10-28T06:33:00.543429Z"
+  }, {
+    "id" : "c6e4e865-80d5-4390-8a3b-256e2d48b86e",
+    "name" : "Dan",
+    "vehicleType" : "SEDAN",
+    "status" : "AVAILABLE",
+    "lat" : 12.973600000000001,
+    "lon" : 77.5946,
+    "rating" : 5.0,
+    "locationUpdatedAt" : "2026-10-28T06:33:00.543429Z"
+  } ],
+  "total" : 2,
+  "page" : 0,
+  "size" : 20
+}
