@@ -101,10 +101,13 @@ cookie's path each fails a test.
 
 ## Known limits
 
-- **Admin login has no lockout or rate limit.** The API's `/api/auth/login` is not rate limited (rate limiting exists only for
-  rider location updates), so an internet-facing panel allows unlimited password guessing. Put it behind a VPN or an
-  IP allow-list, use a long `ADMIN_PASSWORD`, and treat a login limiter (keyed by phone and IP, on the shared Redis limiter) as
-  the next thing to build.
+- **Login throttling is per account, not per address.** `/api/auth/login` allows 5 attempts per phone number at once, then one per
+  minute (`ridehail.login-limit.*`), refusing with 429 + `Retry-After` *before* the password is checked, so a correct guess during a
+  lockout does not get in. Unknown numbers are throttled identically, so the answer reveals nothing about which accounts exist.
+  Shared across instances with Redis. Two consequences: guessing is capped at roughly 1,400 tries a day per account, and someone
+  who knows the admin's phone can keep its allowance empty, so the real admin may wait up to a minute to sign in. There is no
+  per-IP limit, because behind a proxy every user shares the proxy's address; if you front the panel with a WAF or reverse proxy,
+  add an address limit there. A long `ADMIN_PASSWORD` and a VPN or IP allow-list are still the right baseline.
 - **One admin account, no admin audit trail.** The bootstrap admin is the only admin and actions (cancel, refund, resolve) are
   not attributed to a person. Add per-person admin accounts and an `admin_actions` log before more than one person uses this.
 - **Polling, not push.** Admins deliberately cannot subscribe to the WebSocket streams (they carry rider and customer data

@@ -41,6 +41,9 @@ ridehail:
     bootstrap-admin:
       phone: admin
       password: ${ADMIN_PASSWORD:dev-admin-password}
+  login-limit:
+    burst: 5          # attempts per phone number at once ...
+    per-minute: 1     # ... then one more per minute: about 1,400 guesses a day per account instead of unlimited
   pricing:
     currency: USD
     quote-ttl-seconds: 120

@@ -64,8 +64,12 @@ describe("POST /api/session/login", () => {
   it("reports an unreachable API and a rate limit distinctly", async () => {
     fetchMock.mockRejectedValueOnce(new TypeError("down"));
     expect((await login(post("/api/session/login", { phone: "a", password: "b" }))).status).toBe(502);
-    fetchMock.mockResolvedValueOnce(reply(429, {}));
-    expect((await login(post("/api/session/login", { phone: "a", password: "b" }))).status).toBe(429);
+    fetchMock.mockResolvedValueOnce(new Response("{}", { status: 429, headers: { "Retry-After": "42" } }));
+    const limited = await login(post("/api/session/login", { phone: "a", password: "b" }));
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get("Retry-After")).toBe("42");
+    expect((await limited.json()).detail).toContain("42 seconds");
+    expect(limited.headers.getSetCookie()).toEqual([]);
   });
 });
 

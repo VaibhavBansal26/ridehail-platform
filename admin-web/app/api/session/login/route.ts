@@ -21,7 +21,12 @@ export async function POST(req: NextRequest) {
   } catch {
     return json({ detail: "The API is not reachable" }, 502);
   }
-  if (result.status === 429) return json({ detail: "Too many attempts. Wait a moment and try again." }, 429);
+  if (result.status === 429) {
+    const wait = result.retryAfter ?? 60;
+    const res = json({ detail: `Too many sign-in attempts. Try again in ${wait} second${wait === 1 ? "" : "s"}.`, retryAfter: wait }, 429);
+    res.headers.set("Retry-After", String(wait));
+    return res;
+  }
   // wrong password and "not an admin" look the same from outside: no hint about which accounts exist
   if (!result.tokens || result.role !== "ADMIN") return json({ detail: "Wrong phone or password" }, 401);
 

@@ -55,13 +55,16 @@ async function backend(path: string, init: RequestInit): Promise<Response> {
   });
 }
 
-export async function backendLogin(phone: string, password: string): Promise<{ status: number; tokens?: Tokens; role?: string }> {
+export async function backendLogin(phone: string, password: string): Promise<{ status: number; tokens?: Tokens; role?: string; retryAfter?: number }> {
   const res = await backend("/api/auth/login", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ phone, password }),
   });
-  if (!res.ok) return { status: res.status };
+  if (!res.ok) {
+    const wait = Number(res.headers.get("retry-after"));
+    return { status: res.status, retryAfter: Number.isFinite(wait) && wait > 0 ? Math.ceil(wait) : undefined };
+  }
   const body = (await res.json()) as { accessToken: string; refreshToken: string; role: string };
   return { status: 200, tokens: { accessToken: body.accessToken, refreshToken: body.refreshToken }, role: body.role };
 }

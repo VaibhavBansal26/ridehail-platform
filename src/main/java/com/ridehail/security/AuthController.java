@@ -14,9 +14,11 @@ import org.springframework.web.bind.annotation.*;
 class AuthController {
 
     private final AuthService auth;
+    private final LoginRateLimiter loginLimit;
 
-    AuthController(AuthService auth) {
+    AuthController(AuthService auth, LoginRateLimiter loginLimit) {
         this.auth = auth;
+        this.loginLimit = loginLimit;
     }
 
     record RegisterCustomer(@NotBlank String name, @NotBlank String phone, @NotBlank @Size(min = 8, max = 72) String password) {}
@@ -39,6 +41,7 @@ class AuthController {
 
     @PostMapping("/login")
     AuthResult login(@Valid @RequestBody Login r) {
+        loginLimit.check(r.phone());
         return auth.login(r.phone().trim(), r.password());
     }
 
