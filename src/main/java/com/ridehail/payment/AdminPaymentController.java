@@ -1,5 +1,6 @@
 package com.ridehail.payment;
 
+import com.ridehail.admin.AdminAudit;
 import com.ridehail.ledger.LedgerService;
 import com.ridehail.ledger.LedgerService.TrialBalance;
 import java.math.BigDecimal;
@@ -10,6 +11,8 @@ import java.util.function.Function;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 /** Finance operations. Role-gated to ADMIN in SecurityConfig. */
@@ -22,9 +25,11 @@ class AdminPaymentController {
     private final PayoutRepository payouts;
     private final LedgerService ledger;
     private final PayoutService payoutService;
+    private final AdminAudit audit;
 
     AdminPaymentController(PaymentRepository payments, PaymentService paymentService, PayoutRepository payouts,
-                           LedgerService ledger, PayoutService payoutService) {
+                           LedgerService ledger, PayoutService payoutService, AdminAudit audit) {
+        this.audit = audit;
         this.payoutService = payoutService;
         this.payments = payments;
         this.paymentService = paymentService;
@@ -62,13 +67,17 @@ class AdminPaymentController {
     }
 
     @PostMapping("/payments/{id}/retry")
-    PaymentView retry(@PathVariable UUID id) {
-        return PaymentView.of(paymentService.retry(id));
+    PaymentView retry(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+        var payment = paymentService.retry(id);
+        audit.record(jwt, "PAYMENT_RETRIED", "PAYMENT", id, "Retried charge of " + payment.getAmount() + " " + payment.getCurrency());
+        return PaymentView.of(payment);
     }
 
     @PostMapping("/payments/{id}/refund")
-    PaymentView refund(@PathVariable UUID id) {
-        return PaymentView.of(paymentService.refund(id));
+    PaymentView refund(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
+        var payment = paymentService.refund(id);
+        audit.record(jwt, "PAYMENT_REFUNDED", "PAYMENT", id, "Refunded " + payment.getAmount() + " " + payment.getCurrency());
+        return PaymentView.of(payment);
     }
 
     @GetMapping("/payouts")

@@ -236,3 +236,26 @@ export const TrialBalance = z.object({
   balanced: z.boolean(),
 });
 export type TrialBalance = z.infer<typeof TrialBalance>;
+
+export const AdminAccount = z.object({
+  id,
+  phone: z.string(),
+  enabled: z.boolean(),
+  you: z.boolean(),
+  createdAt: instant,
+});
+export type AdminAccount = z.infer<typeof AdminAccount>;
+export const AdminList = z.array(AdminAccount);
+
+export const AdminAction = z.object({
+  id,
+  actorAccountId: id,
+  actorPhone: z.string(),
+  action: z.string(),
+  targetType: z.string().nullable(),
+  targetId: z.string().nullable(),
+  detail: z.string().nullable(),
+  createdAt: instant,
+});
+export type AdminAction = z.infer<typeof AdminAction>;
+export const AuditPage = page(AdminAction);

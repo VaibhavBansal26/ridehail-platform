@@ -14,6 +14,8 @@ finance incidents, and one "needs attention" summary that tells you whether anyt
 | Disputes | Status, amount, reason, evidence deadline (overdue ones in red), what the ledger did, and a **Respond** link into the payment provider's dashboard (only `https://*.stripe.com` links are ever offered). Evidence itself is submitted there, not here. |
 | Incidents | Failed bank payouts, reversed transfers, failed refunds. **Resolve** records what was done (it moves no money). |
 | Ledger | The trial balance by account type and whether debits equal credits. |
+| Audit log | Who did what: every change an admin makes, with the person, the time and the target. The table is append-only (a Postgres trigger refuses updates and deletes, like the ledger). |
+| Admins | One account per person (`POST /api/admin/admins`, password of 12+ characters). Disable or re-enable accounts; you cannot disable yourself or the last active admin. The `ADMIN_PASSWORD` bootstrap account is the first one: create named accounts, then disable it if you like. |
 
 ## Run it
 
@@ -93,7 +95,7 @@ tests then tell you what to update.
 
 ## Tests
 
-`npm test` (Vitest, 87 tests): formatting helpers; open-redirect guard; the BFF's CSRF/Origin check, path allow-list, refresh
+`npm test` (Vitest, 93 tests): formatting helpers; open-redirect guard; the BFF's CSRF/Origin check, path allow-list, refresh
 and logout behaviour; login and proxy route handlers (including that tokens never appear in a response body and that a customer
 or rider login is refused); the API client; the incident-resolve flow in the page; and the contract fixtures. The security
 checks were mutation-tested: removing the CSRF header requirement, the admin-role check, the path allow-list or the refresh
@@ -108,8 +110,11 @@ cookie's path each fails a test.
   who knows the admin's phone can keep its allowance empty, so the real admin may wait up to a minute to sign in. There is no
   per-IP limit, because behind a proxy every user shares the proxy's address; if you front the panel with a WAF or reverse proxy,
   add an address limit there. A long `ADMIN_PASSWORD` and a VPN or IP allow-list are still the right baseline.
-- **One admin account, no admin audit trail.** The bootstrap admin is the only admin and actions (cancel, refund, resolve) are
-  not attributed to a person. Add per-person admin accounts and an `admin_actions` log before more than one person uses this.
+- **A disabled admin's open session lasts up to 15 minutes.** Disabling stops sign-in and token refresh at once, but an access token
+  already issued stays valid until it expires. Change `ridehail.security.access-ttl-minutes` if that is too long.
+- **The audit log covers the panel's actions** (cancel trip, retry/refund payment, resolve incident, create/disable/enable admin),
+  recorded after they succeed. Failed attempts and sign-ins are not logged, and actions taken by calling the API directly with an
+  admin token are recorded the same way (the log is in the API, not the panel).
 - **Polling, not push.** Admins deliberately cannot subscribe to the WebSocket streams (they carry rider and customer data
   addressed to those users), so the map is a 5-second snapshot. A `/user/topic/ops` stream for admins would make it live.
 - **Disputes are answered in the provider's dashboard.** The panel shows deadlines and links there; uploading evidence from

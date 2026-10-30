@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useState } from "react";
-import { BookOpen, Car, CreditCard, Gavel, LayoutDashboard, LogOut, Map, Menu, ShieldAlert, Users, X } from "lucide-react";
+import { BookOpen, Car, History, UserCog, CreditCard, Gavel, LayoutDashboard, LogOut, Map, Menu, ShieldAlert, Users, X } from "lucide-react";
 import { Badge } from "@/components/ui";
 import { useAttention } from "@/lib/queries";
 import { CSRF_HEADER, CSRF_VALUE } from "@/lib/session";
@@ -19,6 +19,8 @@ const NAV: Item[] = [
   { href: "/disputes", label: "Disputes", icon: <Gavel className="size-4" aria-hidden />, badge: "disputes" },
   { href: "/incidents", label: "Incidents", icon: <ShieldAlert className="size-4" aria-hidden />, badge: "incidents" },
   { href: "/ledger", label: "Ledger", icon: <BookOpen className="size-4" aria-hidden /> },
+  { href: "/audit", label: "Audit log", icon: <History className="size-4" aria-hidden /> },
+  { href: "/admins", label: "Admins", icon: <UserCog className="size-4" aria-hidden /> },
 ];
 
 export function Shell({ children }: { children: ReactNode }) {

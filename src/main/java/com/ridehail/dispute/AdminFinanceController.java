@@ -1,5 +1,6 @@
 package com.ridehail.dispute;
 
+import com.ridehail.admin.AdminAudit;
 import com.ridehail.common.ApiExceptions.NotFoundException;
 import com.ridehail.ledger.AccountType;
 import com.ridehail.ledger.LedgerService;
@@ -21,6 +22,8 @@ import java.util.function.Function;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 /** What an admin needs to see and do about disputes and provider problems. Role-gated to ADMIN in SecurityConfig. */
@@ -35,9 +38,11 @@ class AdminFinanceController {
     private final PayoutRepository payouts;
     private final LedgerService ledger;
     private final Clock clock;
+    private final AdminAudit audit;
 
     AdminFinanceController(DisputeRepository disputes, FinanceIncidentRepository incidents, IncidentService incidentService,
-                           PaymentRepository payments, PayoutRepository payouts, LedgerService ledger, Clock clock) {
+                           PaymentRepository payments, PayoutRepository payouts, LedgerService ledger, Clock clock, AdminAudit audit) {
+        this.audit = audit;
         this.disputes = disputes;
         this.incidents = incidents;
         this.incidentService = incidentService;
@@ -122,8 +127,10 @@ class AdminFinanceController {
 
     /** Record that a person dealt with it (e.g. reconciled with the provider). Does not move any money. */
     @PostMapping("/incidents/{id}/resolve")
-    IncidentView resolve(@PathVariable UUID id, @Valid @RequestBody(required = false) ResolveRequest r) {
-        return IncidentView.of(incidentService.resolve(id, r == null ? null : r.note()));
+    IncidentView resolve(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id, @Valid @RequestBody(required = false) ResolveRequest r) {
+        var incident = incidentService.resolve(id, r == null ? null : r.note());
+        audit.record(jwt, "INCIDENT_RESOLVED", "INCIDENT", id, r == null || r.note() == null ? "Resolved without a note" : r.note());
+        return IncidentView.of(incident);
     }
 
     // ---------- overview ----------

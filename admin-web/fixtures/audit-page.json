@@ -1,0 +1,87 @@
+{
+  "items" : [ {
+    "id" : "ab7e1877-412a-4250-a8ef-6f9ec0272a4a",
+    "actorAccountId" : "b6518bc9-6936-4605-81c7-223ff0e4f2d2",
+    "actorPhone" : "admin",
+    "action" : "ADMIN_CREATED",
+    "targetType" : "ADMIN",
+    "targetId" : "a347e08d-a767-4cd1-8b05-6690971145ee",
+    "detail" : "Created admin ops-54fd7881-7fc8-4315-aa88-0870b67ca91e",
+    "createdAt" : "2026-10-30T07:17:40.732078Z"
+  }, {
+    "id" : "7b1addd5-3fe6-4425-bf3c-2101f6851344",
+    "actorAccountId" : "a347e08d-a767-4cd1-8b05-6690971145ee",
+    "actorPhone" : "ops-54fd7881-7fc8-4315-aa88-0870b67ca91e",
+    "action" : "TRIP_CANCELLED",
+    "targetType" : "TRIP",
+    "targetId" : "faaaca42-3761-48bd-9447-67e5f180580f",
+    "detail" : "Cancelled trip",
+    "createdAt" : "2026-10-30T07:17:40.732078Z"
+  }, {
+    "id" : "8bb4ef17-f00a-44f5-a514-a8caca52fb8c",
+    "actorAccountId" : "b6518bc9-6936-4605-81c7-223ff0e4f2d2",
+    "actorPhone" : "admin",
+    "action" : "ADMIN_CREATED",
+    "targetType" : "ADMIN",
+    "targetId" : "b8933787-4806-4d21-8e8f-14333bd99a3d",
+    "detail" : "Created admin ops-79cfeb7e-3860-429f-83c2-afaf1c27c549",
+    "createdAt" : "2026-10-30T07:17:40.732078Z"
+  }, {
+    "id" : "dbe210a5-186d-41ad-a278-21b10b2f8dca",
+    "actorAccountId" : "b6518bc9-6936-4605-81c7-223ff0e4f2d2",
+    "actorPhone" : "admin",
+    "action" : "ADMIN_DISABLED",
+    "targetType" : "ADMIN",
+    "targetId" : "b8933787-4806-4d21-8e8f-14333bd99a3d",
+    "detail" : "Disabled admin ops-79cfeb7e-3860-429f-83c2-afaf1c27c549",
+    "createdAt" : "2026-10-30T07:17:40.732078Z"
+  }, {
+    "id" : "516922fc-4df9-40d8-bbef-4be9da878422",
+    "actorAccountId" : "b6518bc9-6936-4605-81c7-223ff0e4f2d2",
+    "actorPhone" : "admin",
+    "action" : "ADMIN_CREATED",
+    "targetType" : "ADMIN",
+    "targetId" : "ac8e7d09-e27d-40d4-9233-bb6ca767e629",
+    "detail" : "Created admin ops-1f9a2edf-e5a8-4ad8-ab84-603a3bace447",
+    "createdAt" : "2026-10-30T07:17:40.732078Z"
+  }, {
+    "id" : "a463cef3-61ab-44d0-9e11-379095466b56",
+    "actorAccountId" : "b6518bc9-6936-4605-81c7-223ff0e4f2d2",
+    "actorPhone" : "admin",
+    "action" : "ADMIN_CREATED",
+    "targetType" : "ADMIN",
+    "targetId" : "0a471db0-3c6c-4f41-9dd6-a2218d095436",
+    "detail" : "Created admin ops-acd3e3bf-6c31-4477-860d-eeeacd3bfc31",
+    "createdAt" : "2026-10-30T07:17:40.732078Z"
+  }, {
+    "id" : "26a0e7fc-26d4-44ac-af36-efd9cb2c5617",
+    "actorAccountId" : "b6518bc9-6936-4605-81c7-223ff0e4f2d2",
+    "actorPhone" : "admin",
+    "action" : "ADMIN_DISABLED",
+    "targetType" : "ADMIN",
+    "targetId" : "0a471db0-3c6c-4f41-9dd6-a2218d095436",
+    "detail" : "Disabled admin ops-acd3e3bf-6c31-4477-860d-eeeacd3bfc31",
+    "createdAt" : "2026-10-30T07:17:40.732078Z"
+  }, {
+    "id" : "7912d8ea-3060-465d-8a03-e8db8997d071",
+    "actorAccountId" : "b6518bc9-6936-4605-81c7-223ff0e4f2d2",
+    "actorPhone" : "admin",
+    "action" : "ADMIN_ENABLED",
+    "targetType" : "ADMIN",
+    "targetId" : "0a471db0-3c6c-4f41-9dd6-a2218d095436",
+    "detail" : "Enabled admin ops-acd3e3bf-6c31-4477-860d-eeeacd3bfc31",
+    "createdAt" : "2026-10-30T07:17:40.732078Z"
+  }, {
+    "id" : "4b5e3bb6-1db9-42ba-9c82-83be0da9d6f0",
+    "actorAccountId" : "b6518bc9-6936-4605-81c7-223ff0e4f2d2",
+    "actorPhone" : "admin",
+    "action" : "ADMIN_CREATED",
+    "targetType" : "ADMIN",
+    "targetId" : "bbe42024-6f57-4d15-9614-1fcb8b5db0a5",
+    "detail" : "Created admin ops-82f61706-4a8b-49fc-8c3b-8993c28a9e65",
+    "createdAt" : "2026-10-30T07:17:40.732078Z"
+  } ],
+  "total" : 9,
+  "page" : 0,
+  "size" : 20
+}

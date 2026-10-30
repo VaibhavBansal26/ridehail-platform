@@ -3,7 +3,7 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
 import {
-  Attention, DisputePage, Funding, IncidentPage, LiveSnapshot, PaymentPage, PayoutPage, RiderPage, TrialBalance, TripDetail, TripPage,
+  AdminList, AuditPage, Attention, DisputePage, Funding, IncidentPage, LiveSnapshot, PaymentPage, PayoutPage, RiderPage, TrialBalance, TripDetail, TripPage,
 } from "@/lib/schemas";
 
 /**
@@ -12,6 +12,8 @@ import {
  * on whichever side moved.
  */
 const cases: [string, z.ZodType][] = [
+  ["admin-list.json", AdminList],
+  ["audit-page.json", AuditPage],
   ["attention.json", Attention],
   ["dispute-page.json", DisputePage],
   ["funding.json", Funding],

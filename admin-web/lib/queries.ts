@@ -3,7 +3,9 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { get, post, query } from "@/lib/api";
 import {
+  AdminList,
   Attention,
+  AuditPage,
   DisputePage,
   Funding,
   IncidentPage,
@@ -18,6 +20,16 @@ import {
 
 const PAGE_SIZE = 20;
 export { PAGE_SIZE };
+
+export const useAudit = (action: string, page: number) =>
+  useQuery({
+    queryKey: ["audit", action, page],
+    queryFn: () => get("audit" + query({ action, page, size: PAGE_SIZE }), AuditPage),
+    placeholderData: keepPreviousData,
+    refetchInterval: 30_000,
+  });
+
+export const useAdmins = () => useQuery({ queryKey: ["admins"], queryFn: () => get("admins", AdminList) });
 
 export const useAttention = () =>
   useQuery({ queryKey: ["attention"], queryFn: () => get("finance/attention", Attention), refetchInterval: 30_000 });
@@ -96,3 +108,5 @@ export const useRetryPayment = () => useAction((id: string) => post(`payments/${
 export const useRefundPayment = () => useAction((id: string) => post(`payments/${id}/refund`));
 export const useResolveIncident = () =>
   useAction((v: { id: string; note: string }) => post(`incidents/${v.id}/resolve`, { note: v.note }));
+export const useCreateAdmin = () => useAction((v: { phone: string; password: string }) => post("admins", v));
+export const useSetAdminEnabled = () => useAction((v: { id: string; enabled: boolean }) => post(`admins/${v.id}/${v.enabled ? "enable" : "disable"}`));

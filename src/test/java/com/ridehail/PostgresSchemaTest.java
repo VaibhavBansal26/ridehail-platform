@@ -40,9 +40,20 @@ class PostgresSchemaTest {
     }
 
     @Test
-    void flywayAppliedBothMigrations() {
+    void flywayAppliedEveryMigration() {
         assertThat(jdbc.queryForList("select version from flyway_schema_history where success order by installed_rank", String.class))
-                .containsExactly("1", "2", "3", "4");
+                .containsExactly("1", "2", "3", "4", "5");
+    }
+
+    @Test
+    void theAdminAuditLogRefusesEditsAndDeletes() {
+        UUID id = UUID.randomUUID();
+        jdbc.update("insert into admin_actions (id, actor_account_id, actor_phone, action, created_at) values (?, ?, 'tester', 'TEST', now())",
+                id, UUID.randomUUID());
+        assertThatThrownBy(() -> jdbc.update("update admin_actions set actor_phone = 'someone else' where id = ?", id))
+                .isInstanceOf(DataAccessException.class).hasMessageContaining("append-only");
+        assertThatThrownBy(() -> jdbc.update("delete from admin_actions where id = ?", id))
+                .isInstanceOf(DataAccessException.class).hasMessageContaining("append-only");
     }
 
     @Test

@@ -35,6 +35,8 @@ import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
 /** Operations view for the admin panel. Role-gated to ADMIN in SecurityConfig. */
@@ -57,9 +59,11 @@ class AdminController {
     private final TripOfferRepository offers;
     private final TripService tripService;
     private final Clock clock;
+    private final AdminAudit audit;
 
     AdminController(TripRepository trips, RiderRepository riders, CustomerRepository customers, PaymentRepository payments,
-                    DisputeRepository disputes, TripOfferRepository offers, TripService tripService, Clock clock) {
+                    DisputeRepository disputes, TripOfferRepository offers, TripService tripService, Clock clock, AdminAudit audit) {
+        this.audit = audit;
         this.trips = trips;
         this.riders = riders;
         this.customers = customers;
@@ -204,8 +208,10 @@ class AdminController {
     }
 
     @PostMapping("/trips/{id}/cancel")
-    TripView cancel(@PathVariable UUID id) {
+    TripView cancel(@AuthenticationPrincipal Jwt jwt,
+                    @PathVariable UUID id) {
         Trip cancelled = tripService.adminCancel(id);
+        audit.record(jwt, "TRIP_CANCELLED", "TRIP", id, "Cancelled trip");
         return TripView.of(cancelled, namesFor(List.of(cancelled)));
     }
 }
