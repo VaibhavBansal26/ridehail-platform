@@ -14,14 +14,19 @@ import java.util.Set;
 import java.util.TreeSet;
 
 /**
- * JSON-shape contract with the admin web panel. The panel's tests validate the same files with its zod schemas, so a
+ * JSON-shape contract with the web clients (admin panel, customer and rider apps). Their tests validate the same files with zod schemas, so a
  * change on either side fails a test on that side. Regenerate with {@code mvn test -Dfixtures.write=true} and review the diff.
  */
 final class ContractFixtures {
     private ContractFixtures() {}
 
     static void check(ObjectMapper json, String fixture, JsonNode actual) throws IOException {
-        Path file = Path.of("admin-web/fixtures", fixture);
+        check(json, "admin-web/fixtures", fixture, actual);
+    }
+
+    /** {@code dir} is the consumer's fixtures folder: admin-web/fixtures, or clients/fixtures for the customer and rider apps. */
+    static void check(ObjectMapper json, String dir, String fixture, JsonNode actual) throws IOException {
+        Path file = Path.of(dir, fixture);
         if (Boolean.getBoolean("fixtures.write")) {
             Files.createDirectories(file.getParent());
             json.writerWithDefaultPrettyPrinter().writeValue(file.toFile(), actual);

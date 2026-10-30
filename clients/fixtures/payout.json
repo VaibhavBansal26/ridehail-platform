@@ -1,0 +1,10 @@
+{
+  "id" : "620f64bc-e292-457e-9c1f-d3bc24f56754",
+  "amount" : 7.99,
+  "currency" : "USD",
+  "status" : "PAID",
+  "failureReason" : null,
+  "waitingSince" : null,
+  "createdAt" : "2026-10-30T23:35:01.562575Z",
+  "completedAt" : "2026-10-30T23:35:01.562575Z"
+}

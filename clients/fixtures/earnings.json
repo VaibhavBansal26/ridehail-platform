@@ -1,0 +1,15 @@
+{
+  "available" : 7.99,
+  "onHold" : 0,
+  "payoutsInProgress" : 0,
+  "currency" : "USD",
+  "hasPayoutAccount" : false,
+  "payoutBlockedReason" : null,
+  "recent" : [ {
+    "at" : "2026-10-30T23:35:01.562575Z",
+    "direction" : "CREDIT",
+    "amount" : 7.99,
+    "kind" : "PAYMENT_CAPTURE",
+    "description" : "Trip 57b943f1-d1ad-4bce-92cd-e18f08c09b48"
+  } ]
+}
