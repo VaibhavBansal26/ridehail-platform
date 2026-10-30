@@ -123,6 +123,15 @@ public class StripeWebhookService {
             throw new InvalidWebhookException("Malformed webhook", e);
         }
 
+        // A correctly signed event from the other mode (a test endpoint's secret left in a live deployment, or the reverse)
+        // must never touch real books. Answer 200 so Stripe does not keep retrying, and shout in the log.
+        boolean eventIsLive = root.path("livemode").asBoolean(false);
+        if (props.mode().filter(m -> (m == StripeProperties.Mode.LIVE) != eventIsLive).isPresent()) {
+            log.error("Ignoring {} event {}: it is a {}-mode event but the API key is {}-mode. Check STRIPE_WEBHOOK_SECRET.",
+                    type, eventId, eventIsLive ? "live" : "test", eventIsLive ? "test" : "live");
+            return Outcome.IGNORED;
+        }
+
         if (processed.existsById(eventId)) return Outcome.DUPLICATE;
 
         boolean known = switch (type) {

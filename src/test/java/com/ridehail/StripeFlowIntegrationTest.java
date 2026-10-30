@@ -121,6 +121,23 @@ class StripeFlowIntegrationTest extends ApiTestBase {
     }
 
     @Test
+    void aSignedEventFromTheOtherModeIsIgnoredAndChangesNothing() throws Exception {
+        // the app runs with a test-mode key: a live-mode event, even correctly signed, must not touch the books
+        Actor customer = customerWithoutCard("Mode");
+        setProviderCustomer(customer, "cus_mode");
+        String object = "{\"id\":\"seti_m\",\"customer\":\"cus_mode\",\"payment_method\":\"pm_mode\"}";
+        long now = System.currentTimeMillis() / 1000;
+
+        String live = event("evt_live_" + UUID.randomUUID(), "setup_intent.succeeded", object)
+                .replace("\"livemode\":false", "\"livemode\":true");
+        postRaw(live, sign(live, now, SECRET)).andExpect(status().isOk()).andExpect(content().string("IGNORED"));
+        assertThat(fetch("/api/customers/me", customer).get("hasPaymentMethod").asBoolean()).isFalse();
+
+        webhook("setup_intent.succeeded", object).andExpect(status().isOk()).andExpect(content().string("HANDLED"));
+        assertThat(fetch("/api/customers/me", customer).get("hasPaymentMethod").asBoolean()).isTrue();
+    }
+
+    @Test
     void eventsFromEitherWebhookEndpointAreAcceptedEachWithItsOwnSecret() throws Exception {
         Actor rider = onlineRider("Asha", 0.005);
         var r = riderRepo.findById(rider.id()).orElseThrow();

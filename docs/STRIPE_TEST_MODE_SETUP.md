@@ -62,7 +62,13 @@ name below differs slightly, search for the term in italics.
 | `STRIPE_ONBOARDING_REFRESH_URL` | where Stripe sends a rider whose onboarding link expired | e.g. `ridehail://payouts/retry`. The app should call the onboarding endpoint again for a fresh link. |
 | `JWT_SECRET`, `ADMIN_PASSWORD`, `ALLOWED_ORIGINS`, `DB_URL`, `DB_USER`, `DB_PASSWORD` | | Only for the `prod` profile. Not needed for local testing. |
 
-The app refuses to start in Stripe mode without an API key and at least one webhook secret.
+The app refuses to start in Stripe mode without an API key and at least one webhook secret, and it checks they look right
+so a mix-up fails at startup instead of as failed payments later: the API key must be a secret or restricted key
+(`sk_`/`rk_` + `test`/`live`), the publishable key must be a `pk_` key **of the same mode**, and every webhook secret must start
+with `whsec_`. The error names the setting, never its value. A healthy start logs `Stripe gateway enabled in TEST mode` (or `LIVE`).
+
+Signed events from the *other* mode are ignored: a live-mode event reaching a test-key deployment (or the reverse) answers `200`
+so Stripe stops retrying, changes nothing, and logs `Ignoring … event … Check STRIPE_WEBHOOK_SECRET` at `ERROR`.
 
 Secrets never go in git. For local work, keep them in an untracked `.env.stripe` file:
 
@@ -367,6 +373,8 @@ You're done when A1–A3, B1, C1–C4, D1–D4, E1–E4, F1, G1 all behaved as s
 | Payment `REQUIRES_ATTENTION`, reason `Card declined: …` | The customer's card failed. After they save another card, retry from the admin endpoint (H1 step 5). |
 | Payout stays `AWAITING_FUNDS` | Normal while card payments are still pending at Stripe (H3); compare `GET /api/admin/payouts/funding`. It releases itself when funds settle. Long-running: check you subscribed `balance.available`, and that the card payments are really succeeding. |
 | Payout `REQUIRES_ATTENTION` | Stripe errored or timed out repeatedly (8 attempts over about an hour), so the outcome is unknown: check *Dashboard → Connect → Transfers* for the payout's id in the metadata `ridehail_key`, then resolve by hand. Its `failureReason` says why. |
+| App fails at start: `Stripe is misconfigured: …` | A key is the wrong kind or the wrong mode (the message says which setting). Typical: a `pk_` key in `STRIPE_API_KEY`, a test publishable key next to a live secret key, or an endpoint id instead of its `whsec_` signing secret. |
+| Log: `Ignoring … event … it is a live-mode event but the API key is test-mode` (or the reverse) | `STRIPE_WEBHOOK_SECRET` belongs to the other mode's endpoint. Use the secrets of the endpoints created in the same mode as the API key. |
 | App fails at start: `webhook-secret are required` | `STRIPE_API_KEY` or `STRIPE_WEBHOOK_SECRET` isn't set in that shell. |
 | `409` "Phone number already registered" | The local database persists in `data/`. Use new phone numbers, or delete `data/` and restart. |
 
@@ -382,6 +390,13 @@ You're done when A1–A3, B1, C1–C4, D1–D4, E1–E4, F1, G1 all behaved as s
 - [ ] Run with `SPRING_PROFILES_ACTIVE=prod`. It requires the secrets above plus `JWT_SECRET`, `ADMIN_PASSWORD`,
   `ALLOWED_ORIGINS` and the database settings, and it refuses to start with the simulator.
 - [ ] Database: the `prod` profile runs the Flyway migrations at startup and then validates the schema against the entities.
+- [ ] **Check the startup log says `Stripe gateway enabled in LIVE mode`.** If it says TEST, the key is a test key.
+- [ ] **Do a real first transaction before opening to customers.** With your own card and your own rider account: save the card,
+  complete a trip for the minimum fare, confirm the charge in the live Dashboard and the ledger (`balanced: true`), pay the rider out,
+  then refund it from the admin panel. Both webhook endpoints should show `200` deliveries under *Developers → Webhooks*;
+  a delivery that keeps failing is a wrong secret (see section 5).
+- [ ] **Know the platform's float.** Payouts draw on *available* Stripe balance, and card money takes days to settle (H3).
+  Until the first charges settle, early payouts show `AWAITING_FUNDS`. That is expected; tell the first riders.
 - [ ] Alert on `GET /api/admin/finance/attention` reporting `needsAction: true` (open chargebacks, open incidents, payments or payouts
   in `REQUIRES_ATTENTION`), and on the `ERROR`-level log lines `Finance incident …` and `Dispute … cannot match`. A chargeback has a
   response deadline (`evidenceDueBy`): somebody must respond in the Stripe Dashboard before it, or the dispute is lost by default.
@@ -401,7 +416,13 @@ You're done when A1–A3, B1, C1–C4, D1–D4, E1–E4, F1, G1 all behaved as s
   doesn't set it, so riders must be in the platform's country.
 - **Refunds don't claw back from the rider's Stripe account** (no transfer reversal), only in our ledger.
 - **3-D Secure for saved cards.** Off-session charges on cards that demand authentication are declined; there's no flow yet to
-  bring the customer back in to authenticate.
+  bring the customer back in to authenticate. Cards saved through the setup flow (which authenticates once, with off-session
+  usage) should mostly avoid this per Stripe's guidance, but some issuers still ask; H5 is the only drill that touches it and
+  real-card behaviour has not been observed. The customer is then blocked until they save another card. Closing the
+  gap needs the app to confirm the payment on-device, so it belongs with the customer client.
+- **Stripe forgets idempotency keys after about 24 hours.** The automatic retries (about an hour) are well inside that. An admin
+  **Retry** deliberately uses a fresh key, so retry only after checking the first attempt did not charge the customer (the
+  payment's reference in the Dashboard).
 - **Disputes are recorded, frozen and settled in the ledger, but not answered.** We do not submit evidence to Stripe; an admin
   does that in the Stripe Dashboard before the deadline (the admin API gives the link). Reversed transfers and failed refunds are
   raised as incidents for a person; we do not repair the books automatically. See [DISPUTES.md](DISPUTES.md) for the details and

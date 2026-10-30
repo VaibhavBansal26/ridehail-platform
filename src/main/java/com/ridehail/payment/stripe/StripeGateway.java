@@ -66,7 +66,12 @@ public class StripeGateway implements PaymentGateway, OnboardingGateway {
             throw new IllegalStateException(
                     "ridehail.stripe.api-key and ridehail.stripe.webhook-secret are required when ridehail.payments.gateway=stripe");
         }
+        var problems = props.problems();
+        if (!problems.isEmpty()) {
+            throw new IllegalStateException("Stripe is misconfigured: " + String.join("; ", problems));
+        }
         this.props = props;
+        log.info("Stripe gateway enabled in {} mode", props.mode().orElseThrow());
         var builder = StripeClient.builder()
                 .setApiKey(props.apiKey())
                 .setMaxNetworkRetries(props.maxNetworkRetries())
