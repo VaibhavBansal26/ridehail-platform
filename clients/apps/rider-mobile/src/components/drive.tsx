@@ -8,6 +8,7 @@ import { TripPanel } from "@/components/trip-panel";
 import { Button, Card, ErrorNote, Muted, useTheme } from "@/components/ui";
 import { api } from "@/lib/api";
 import { startBackgroundTracking, stopBackgroundTracking } from "@/lib/background";
+import { registerForPush } from "@/lib/push";
 import { manualPosition, phonePosition, useLocationReporter } from "@/lib/position";
 import { useActiveTrip, useGoOffline, useGoOnline, useOffers, useRider } from "@/lib/queries";
 
@@ -48,6 +49,7 @@ export function Drive() {
   }, [online]);
 
   async function beginShift() {
+    void registerForPush({ prompt: true }); // offers are time-limited: the rider wants to hear about them with the screen off
     setPositionError(null);
     setFinished(null);
     try {

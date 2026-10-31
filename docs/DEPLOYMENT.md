@@ -72,6 +72,30 @@ Built but **not** run here (a gap in this environment, not a known defect):
    a chargeback deadline is running.
 9. **Backups.** Schedule `scripts/backup-postgres.sh` (or your managed database's snapshots) and put the restore drill on a calendar.
 
+## Phone notifications
+
+A rider only hears about an offer while the app is open unless notifications are on. The server sends them through **Expo's push
+service**, which forwards to Apple and Google; nothing is sent until you choose a provider.
+
+| | |
+|---|---|
+| `PUSH_PROVIDER` | `none` (default in development: nothing leaves the server) or `expo` (the default under the `prod` profile) |
+| `EXPO_ACCESS_TOKEN` | only if you turned on "enhanced security for push" in your Expo project |
+
+- **What is sent**, and only these: a new ride request to the rider (fare and distance, held by the provider for no longer than the
+  offer lasts, so a stale offer never arrives late), "your rider is on the way / has arrived" to the customer, a cancellation to both,
+  "no riders available", a failed payment, and a failed bank payout. **No names beyond a rider's first name, no phone numbers, no
+  addresses, no coordinates.** While the app is open nothing is shown (the live connection already told them).
+- **Sending never touches a ride.** It runs on its own small thread pool with a bounded queue; a provider outage drops notifications,
+  logs a warning, and nothing else. Phones the provider reports as gone (app uninstalled) are forgotten.
+- **To make it work on real phones** you need, outside this repository: an Expo account and an EAS project (put its id in each phone
+  app's `app.json` as `extra.eas.projectId`), push credentials (Apple's APNs key and Google's FCM credentials) added to the EAS
+  project, and a **development or production build** of each phone app. Expo Go cannot receive remote push on Android. Without a
+  project id the app skips registration quietly and works as before.
+- **Not verified:** delivery to a real phone, and the Expo service itself. What is tested is the server (registration, who gets what,
+  privacy of the text, retries, uninstalled phones, outage isolation), the Expo adapter against a local stand-in, and the phone apps'
+  registration logic with the OS modules mocked.
+
 ## Rolling out a new version
 
 - **Rolling restarts are safe**: instances shut down gracefully (in-flight requests finish, up to 25 s), the gateway re-resolves and
@@ -139,7 +163,7 @@ scripts/restore-drill.sh /backups/ridehail-<timestamp>.dump       # restores to 
 - **No per-IP rate limit** on sign-in (it is per account); put a WAF or the gateway's `limit_req` in front for that.
 - **A web page only reports a rider's position while it is open**; the phone app is what keeps reporting with the screen off, and it
   has not yet been run on a device.
-- **No push notifications** to phones: a rider only receives offers while the app is open.
+- **Push notifications are built but unproven on a device** (see above): until credentials and a build exist, a rider only receives offers while the app is open.
 - **Single region.** Losing the region loses the service until you restore elsewhere from backups.
 - **Capacity is unmeasured** on production-sized hardware. Run `scripts/loadtest.mjs` against a staging copy before a launch and
   after big changes; it prints latency percentiles, failures, and whether the books still balance.

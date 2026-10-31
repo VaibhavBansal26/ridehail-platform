@@ -17,7 +17,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 @Configuration
 @EnableScheduling
-@EnableConfigurationProperties({PricingProperties.class, DispatchProperties.class, SecurityProperties.class, com.ridehail.security.LoginLimitProperties.class,
+@EnableConfigurationProperties({com.ridehail.notify.NotificationProperties.class, PricingProperties.class, DispatchProperties.class, SecurityProperties.class, com.ridehail.security.LoginLimitProperties.class,
         PaymentProperties.class, StripeProperties.class, TrackingProperties.class, DisputeProperties.class,
         RateLimitProperties.class, RealtimeProperties.class})
 public class AppConfig {

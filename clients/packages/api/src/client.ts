@@ -117,6 +117,12 @@ export function createApi(opts: ApiOptions) {
       complete: (id: string) => post(`/api/trips/${id}/complete`, Trip),
     },
 
+    /** Phone notifications: tell the server where to reach this phone (idempotent, call on every launch), and stop on sign-out. */
+    devices: {
+      register: (token: string, platform: "ios" | "android") => request({ method: "PUT", path: "/api/devices", body: { token, platform } }, nothing),
+      unregister: (token: string) => post("/api/devices/unregister", nothing, { token }),
+    },
+
     customer: {
       me: () => get("/api/customers/me", Customer),
       /**

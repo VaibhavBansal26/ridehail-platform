@@ -145,3 +145,16 @@ cd apps/customer-mobile && EXPO_PUBLIC_API_URL=http://<your computer's address>:
 - **Verification:** both customer apps were driven through a whole ride in a browser against the real API (the phone app through
   Expo's web build): booking, a live push when a rider accepts, live distance, arrival, the ride, and a Captured receipt.
   The phone app has not been run on a simulator or device (none is set up here).
+
+## phone notifications (rider-mobile and customer-mobile)
+
+Both phone apps register with `PUT /api/devices` and the server notifies them when the app is closed (see
+[../docs/DEPLOYMENT.md](../docs/DEPLOYMENT.md#phone-notifications) for what is sent and the provider setup).
+
+- **When it asks for permission:** the rider app when they tap *Go online*, the customer app when they request a ride: the
+  moments the permission is obviously worth giving. On every other launch it only re-registers if permission was already given.
+- **Tapping a notification** opens the app on the right screen (a failed bank payout opens a rider's Earnings, a failed payment a
+  customer's Account; everything else opens the home screen, which shows the current offer or trip).
+- **Signing out** tells the server to stop notifying that phone about the account, before the session is cleared.
+- **Needs** a development or production build, an EAS project id in `app.json` (`extra.eas.projectId`) and push credentials. Without
+  a project id registration reports "unavailable" and the app carries on. **Not run on a device.**

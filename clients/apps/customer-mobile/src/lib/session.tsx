@@ -1,6 +1,7 @@
 import { type AuthResult, saveSession } from "@ridehail/api";
 import { createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useState } from "react";
 import { api, onSignedOut } from "@/lib/api";
+import { unregisterPush } from "@/lib/push";
 import { tokenStore } from "@/lib/tokens";
 
 export type SessionState = "loading" | "signedOut" | "signedIn";
@@ -53,6 +54,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const signOut = useCallback(async () => {
+    await unregisterPush(); // while the session still works: afterwards this phone gets nothing about this account
     await tokenStore.save(null);
     setState("signedOut");
   }, []);

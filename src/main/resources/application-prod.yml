@@ -26,6 +26,8 @@ ridehail:
       client-passcode: ${RABBITMQ_PASSWORD:}
   ratelimit:
     store: ${RATELIMIT_STORE:redis}        # redis = limits shared by every instance (REDIS_HOST, REDIS_PASSWORD)
+  notifications:
+    provider: ${PUSH_PROVIDER:expo}
   payments:
     gateway: stripe   # the simulated gateway never loads in prod
   stripe:

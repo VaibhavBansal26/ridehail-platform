@@ -82,6 +82,11 @@ ridehail:
     onboarding-refresh-url: ${STRIPE_ONBOARDING_REFRESH_URL:ridehail://payouts/retry}
     card-return-url: ${STRIPE_CARD_RETURN_URL:ridehail://card/done}
     card-cancel-url: ${STRIPE_CARD_CANCEL_URL:ridehail://card/cancelled}
+  notifications:
+    # Phone notifications for when the app is closed. "none" sends nothing (development); "expo" sends through Expo's push service.
+    provider: ${PUSH_PROVIDER:none}
+    expo-access-token: ${EXPO_ACCESS_TOKEN:}    # only if you turned on "enhanced security" for push in your Expo project
+    max-devices-per-account: 10
   payments:
     gateway: fake   # fake | stripe
     commission-rate: 0.20

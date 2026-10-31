@@ -42,6 +42,12 @@
         {
           "locationWhenInUsePermission": "Ridehail uses your location to set your pickup point."
         }
+      ],
+      [
+        "expo-notifications",
+        {
+          "defaultChannel": "default"
+        }
       ]
     ],
     "experiments": {

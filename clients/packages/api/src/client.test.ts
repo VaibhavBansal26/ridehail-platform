@@ -106,6 +106,19 @@ describe("requests", () => {
   });
 });
 
+describe("devices", () => {
+  it("registers a phone with PUT and unregisters with POST, both returning nothing", async () => {
+    const { api, calls } = setup(() => new Response(null, { status: 204 }));
+    await expect(api.devices.register("ExponentPushToken[abcdefgh]", "ios")).resolves.toBeUndefined();
+    await expect(api.devices.unregister("ExponentPushToken[abcdefgh]")).resolves.toBeUndefined();
+    expect(calls[0]!.init.method).toBe("PUT");
+    expect(calls[0]!.url).toBe(`${BASE}/api/devices`);
+    expect(JSON.parse(String(calls[0]!.init.body))).toEqual({ token: "ExponentPushToken[abcdefgh]", platform: "ios" });
+    expect(calls[1]!.url).toBe(`${BASE}/api/devices/unregister`);
+    expect(JSON.parse(String(calls[1]!.init.body))).toEqual({ token: "ExponentPushToken[abcdefgh]" });
+  });
+});
+
 describe("token refresh", () => {
   it("refreshes once on 401, saves the new tokens and repeats the request", async () => {
     let first = true;

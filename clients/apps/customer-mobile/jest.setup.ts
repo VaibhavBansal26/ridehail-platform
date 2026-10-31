@@ -16,3 +16,16 @@ jest.mock("expo-location", () => ({
 
 // tell React these tests run under act(), so a query timer firing after a test ends does not warn or corrupt the next one
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+jest.mock("expo-notifications", () => ({
+  setNotificationHandler: jest.fn(),
+  setNotificationChannelAsync: jest.fn(),
+  getPermissionsAsync: jest.fn(),
+  requestPermissionsAsync: jest.fn(),
+  getExpoPushTokenAsync: jest.fn(),
+  useLastNotificationResponse: jest.fn(() => null),
+  AndroidImportance: { HIGH: 4 },
+  IosAuthorizationStatus: { PROVISIONAL: 3 },
+  DEFAULT_ACTION_IDENTIFIER: "expo.modules.notifications.actions.DEFAULT",
+}));
+jest.mock("expo-constants", () => ({ __esModule: true, default: { expoConfig: { extra: { eas: { projectId: "test-project" } } } } }));

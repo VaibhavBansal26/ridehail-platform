@@ -3,6 +3,7 @@ import { Link } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
 import { Button, Card, ErrorNote, Field, Muted, useTheme } from "@/components/ui";
+import { registerForPush } from "@/lib/push";
 import { PLACES } from "@/lib/places";
 import { currentPosition, type Fix, parseCoordinates } from "@/lib/position";
 import { useBook, useCustomer, useQuote } from "@/lib/queries";
@@ -137,7 +138,7 @@ export function Book() {
             </Text>
           ) : null}
           {book.error ? <ErrorNote>{book.error.message}</ErrorNote> : null}
-          <Button label="Request ride" busy={book.isPending} disabled={!!noCard} onPress={() => book.mutate(live.quoteId)} />
+          <Button label="Request ride" busy={book.isPending} disabled={!!noCard} onPress={() => book.mutate(live.quoteId, { onSuccess: () => void registerForPush({ prompt: true }) })} />
         </Card>
       ) : quote.data ? (
         <Muted style={{ textAlign: "center" }}>That fare has expired. Tap See fare for a fresh one.</Muted>

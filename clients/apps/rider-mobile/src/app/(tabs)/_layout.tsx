@@ -1,5 +1,6 @@
 import { Redirect, Tabs } from "expo-router";
 import { ActivityIndicator, View } from "react-native";
+import { PushBridge } from "@/components/push-bridge";
 import { RealtimeProvider } from "@/lib/realtime";
 import { useSession } from "@/lib/session";
 
@@ -9,6 +10,7 @@ export default function TabsLayout() {
   if (state === "signedOut") return <Redirect href="/login" />;
   return (
     <RealtimeProvider>
+      <PushBridge />
       <Tabs screenOptions={{ headerShown: false }}>
         <Tabs.Screen name="index" options={{ title: "Drive" }} />
         <Tabs.Screen name="earnings" options={{ title: "Earnings" }} />
