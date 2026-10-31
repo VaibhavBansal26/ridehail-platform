@@ -1,6 +1,7 @@
 spring:
   datasource:
-    url: ${DB_URL:jdbc:postgresql://localhost:5432/ridehail}
+    # DB_URL wins; platforms that hand out the parts separately (Render) set DB_HOST, DB_PORT and DB_NAME instead
+    url: ${DB_URL:jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:ridehail}}
     username: ${DB_USER:ridehail}
     password: ${DB_PASSWORD:ridehail}
   jpa:

@@ -30,7 +30,7 @@ name below differs slightly, search for the term in italics.
 - [ ] **1.3 Note your platform's country** (*Settings → Business details*). Riders must be in the same country as the
   platform for this integration; see "Known gaps" at the end. Set `RIDEHAIL_STRIPE_CONNECT_COUNTRY` to its two-letter code (e.g. `US`).
 - [ ] **1.4 Check cards are enabled.** *Settings → Payment methods*: **Cards** on.
-- [ ] **1.5 Create the two webhook endpoints.** Only needed for a deployed environment. For local work use the Stripe CLI
+- [ ] **1.5 Create the webhook endpoints (A and B, plus C for Accounts v2).** Only needed for a deployed environment. For local work use the Stripe CLI
   (section 3) and skip this. Stripe signs each endpoint with its **own secret**, and delivers events by *scope*, so we need two endpoints
   pointing at the same URL, `https://<your-host>/api/webhooks/stripe`:
 
@@ -38,6 +38,12 @@ name below differs slightly, search for the term in italics.
   |---|---|---|
   | **A: your account** | **Your account** | `setup_intent.succeeded`, `payment_intent.succeeded`, `balance.available`, `charge.dispute.created`, `charge.dispute.updated`, `charge.dispute.closed`, `refund.failed`*, `transfer.reversed` |
   | **B: Connect** | **Connected accounts** | `account.updated`, `payout.failed`, `account.external_account.created`, `account.external_account.updated` |
+  | **C: rider accounts (v2)** | **Connected accounts**, *thin* payload style (an "event destination") | `v2.core.account[configuration.recipient].capability_status_updated`, `v2.core.account[configuration.recipient].updated`, `v2.core.account[requirements].updated` |
+
+  C exists because riders' accounts are Accounts v2: they also send these events, and the app answers each by asking Stripe whether the
+  rider can now be paid. Locally the second `stripe listen` (section 3.2) plays this part and was tried against real Stripe; creating C
+  in the Dashboard has not been tried, so check the event names against the list it offers. B alone may be enough, because Stripe
+  also sent the ordinary `account.updated` for v2 accounts in testing, but do not rely on that.
 
   \* If `refund.failed` is not in the event list, skip it; refunds still work, you just lose one alert.
   The `charge.dispute.*` events drive dispute handling (see [DISPUTES.md](DISPUTES.md)): subscribe to all three. A dispute
@@ -45,7 +51,7 @@ name below differs slightly, search for the term in italics.
   `balance.available` is how a payout that is waiting for card funds to settle gets released the moment Stripe has the money;
   without it the payout is still released, just at the next poll (every 15 minutes by default).
   Set the endpoints' **API version** to the same one the SDK uses (the Dashboard shows the choices; pick the newest),
-  then copy each endpoint's **Signing secret** (`whsec_…`). **Both** go into `STRIPE_WEBHOOK_SECRET`, comma-separated (section 2).
+  then copy each endpoint's **Signing secret** (`whsec_…`). **All** of them go into `STRIPE_WEBHOOK_SECRET`, comma-separated (section 2).
 
   > Why two: `account.updated` (how we learn a rider finished onboarding) and `payout.failed` happen *on the rider's
   > connected account*, so Stripe only sends them to a Connected-accounts endpoint. With only endpoint A, riders would

@@ -1,0 +1,134 @@
+# Render Blueprint: the API, the admin panel, the rider and customer web apps, and a Postgres database, all on Render's FREE tier.
+# See docs/DEPLOYMENT.md ("Deploying on Render") for the steps, what the free tier costs you, and how to go beyond a demo.
+#
+# Secrets are never in this file: every `sync: false` value is asked for in the Render dashboard when the Blueprint is created.
+# The service names below decide the public addresses (https://<name>.onrender.com). If Render finds a name already taken it adds a
+# suffix; then fix ALLOWED_ORIGINS, BACKEND_URL, REALTIME_URL and the Stripe URLs to match.
+#
+# What a free demo leaves out on purpose: Redis (rate limits are per instance) and RabbitMQ (realtime does not cross instances),
+# because it runs ONE API instance. Add them, and set REALTIME_BROKER=relay and RATELIMIT_STORE=redis, before running more than one.
+
+databases:
+  - name: vb-ridehail-db
+    plan: free                  # expires 30 days after creation; upgrade or restore elsewhere before then
+    region: oregon
+    databaseName: ridehail
+    postgresMajorVersion: "16"  # what the schema tests run against
+
+services:
+  # ---------------------------------------------------------------------------------------------- the API
+  - type: web
+    name: vb-ridehail-api
+    runtime: docker
+    plan: free                  # 512 MB: the heap is capped below to fit. It sleeps after 15 idle minutes (the first request is slow).
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: PORT
+        value: "8080"
+      - key: SPRING_PROFILES_ACTIVE
+        value: prod
+      - key: JAVA_TOOL_OPTIONS
+        value: -Xmx300m -XX:MaxMetaspaceSize=128m -Xss512k -XX:TieredStopAtLevel=1 -XX:+ExitOnOutOfMemoryError
+      - key: DB_HOST
+        fromDatabase: {name: vb-ridehail-db, property: host}
+      - key: DB_PORT
+        fromDatabase: {name: vb-ridehail-db, property: port}
+      - key: DB_NAME
+        fromDatabase: {name: vb-ridehail-db, property: database}
+      - key: DB_USER
+        fromDatabase: {name: vb-ridehail-db, property: user}
+      - key: DB_PASSWORD
+        fromDatabase: {name: vb-ridehail-db, property: password}
+      - key: JWT_SECRET
+        generateValue: true     # random; changing it signs everyone out
+      - key: DOCUMENT_ENCRYPTION_KEY
+        generateValue: true     # random 256-bit, base64; losing it makes every stored rider document unreadable
+      - key: ADMIN_PASSWORD
+        sync: false             # the bootstrap admin's password (phone: admin). Choose a long one.
+      - key: ALLOWED_ORIGINS
+        value: https://vb-ridehail-admin.onrender.com,https://vb-ridehail-rider.onrender.com,https://vb-ridehail-customer.onrender.com
+      - key: REALTIME_BROKER
+        value: simple           # one instance: no RabbitMQ needed
+      - key: RATELIMIT_STORE
+        value: memory           # one instance: no Redis needed
+      - key: PUSH_PROVIDER
+        value: none             # no phone-app notifications from a demo
+      - key: RIDER_VERIFICATION_REQUIRED
+        value: "true"
+      - key: STRIPE_API_KEY
+        sync: false             # sk_test_... (or rk_test_...). Test keys only for a demo.
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false             # pk_test_...
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false             # whsec_..., one per webhook endpoint, comma separated. Enter whsec_placeholder first, then the real ones.
+      - key: RIDEHAIL_STRIPE_CONNECT_COUNTRY
+        value: US
+      - key: STRIPE_ONBOARDING_RETURN_URL
+        value: https://vb-ridehail-rider.onrender.com/earnings
+      - key: STRIPE_ONBOARDING_REFRESH_URL
+        value: https://vb-ridehail-rider.onrender.com/earnings
+      - key: STRIPE_CARD_RETURN_URL
+        value: https://vb-ridehail-customer.onrender.com/account
+      - key: STRIPE_CARD_CANCEL_URL
+        value: https://vb-ridehail-customer.onrender.com/account
+
+  # ---------------------------------------------------------------------------------------------- the admin panel
+  - type: web
+    name: vb-ridehail-admin
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./admin-web/Dockerfile
+    dockerContext: ./admin-web
+    healthCheckPath: /login
+    autoDeploy: true
+    envVars:
+      - key: BACKEND_URL
+        value: https://vb-ridehail-api.onrender.com
+      - key: ALLOW_INSECURE_COOKIES
+        value: "false"
+
+  # ---------------------------------------------------------------------------------------------- the rider web app
+  - type: web
+    name: vb-ridehail-rider
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./clients/Dockerfile.web
+    dockerContext: ./clients
+    healthCheckPath: /login
+    autoDeploy: true
+    envVars:
+      - key: APP               # Render passes env vars to the Docker build as build arguments
+        value: rider-web
+      - key: BACKEND_URL
+        value: https://vb-ridehail-api.onrender.com
+      - key: REALTIME_URL
+        value: wss://vb-ridehail-api.onrender.com/ws
+      - key: ALLOW_INSECURE_COOKIES
+        value: "false"
+
+  # ---------------------------------------------------------------------------------------------- the customer web app
+  - type: web
+    name: vb-ridehail-customer
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./clients/Dockerfile.web
+    dockerContext: ./clients
+    healthCheckPath: /login
+    autoDeploy: true
+    envVars:
+      - key: APP
+        value: customer-web
+      - key: BACKEND_URL
+        value: https://vb-ridehail-api.onrender.com
+      - key: REALTIME_URL
+        value: wss://vb-ridehail-api.onrender.com/ws
+      - key: ALLOW_INSECURE_COOKIES
+        value: "false"
+      # DEV_CARD_SHORTCUT is deliberately not set: the "use a test card" button must never exist outside development
