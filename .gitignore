@@ -1,6 +1,7 @@
 target/
 data/
 .env*
+!.env.production.example
 *.log
 .idea/
 .vscode/

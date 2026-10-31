@@ -21,4 +21,6 @@ public interface FinanceIncidentRepository extends JpaRepository<FinanceIncident
     Page<FinanceIncident> findByType(IncidentType type, Pageable pageable);
 
     List<FinanceIncident> findByStatus(IncidentStatus status);
+
+    long countByStatus(IncidentStatus status);
 }

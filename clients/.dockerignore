@@ -1,0 +1,9 @@
+**/node_modules
+**/.next
+**/.expo
+**/dist
+**/.env*
+!**/.env.example
+apps/*-mobile
+!apps/rider-mobile/package.json
+!apps/customer-mobile/package.json

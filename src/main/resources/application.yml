@@ -21,6 +21,12 @@ spring:
       timeout: 200ms
       connect-timeout: 500ms
 
+server:
+  shutdown: graceful                    # a rolling deploy lets in-flight requests finish instead of cutting them off
+  forward-headers-strategy: framework   # behind a load balancer or gateway: honour X-Forwarded-For/-Proto
+
+spring.lifecycle.timeout-per-shutdown-phase: 25s
+
 management:
   health:
     redis:
@@ -28,7 +34,11 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info,metrics
+        include: health,info,metrics,prometheus
+  metrics:
+    distribution:
+      percentiles-histogram:
+        http.server.requests: true   # lets Prometheus compute p95/p99 request times (see docker/prometheus/alerts.yml)
 
 ridehail:
   security:

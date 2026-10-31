@@ -1,0 +1,52 @@
+# syntax=docker/dockerfile:1
+#
+# One image recipe for both Next.js web apps in this workspace. Build from this folder (the workspace root):
+#   docker build -f Dockerfile.web --build-arg APP=rider-web    -t ridehail-rider-web .
+#   docker build -f Dockerfile.web --build-arg APP=customer-web -t ridehail-customer-web .
+# Only that app's dependencies are installed (not the phone apps' ~1 GB of React Native), and the image runs the standalone
+# server Next.js traces for it. Configuration is read at request time from the environment, never baked in: BACKEND_URL,
+# REALTIME_URL, ALLOW_INSECURE_COOKIES (see each app's .env.example).
+ARG APP=rider-web
+
+# ---- dependencies ----
+FROM node:24-alpine AS deps
+ARG APP
+WORKDIR /w
+# every workspace manifest is needed for the lockfile to match, but only the chosen app's dependencies are installed
+COPY package.json package-lock.json ./
+COPY packages/api/package.json packages/api/
+COPY apps/rider-web/package.json apps/rider-web/
+COPY apps/customer-web/package.json apps/customer-web/
+COPY apps/rider-mobile/package.json apps/rider-mobile/
+COPY apps/customer-mobile/package.json apps/customer-mobile/
+RUN --mount=type=cache,target=/root/.npm npm ci --workspace=@ridehail/api --workspace=ridehail-${APP}
+
+# ---- build ----
+FROM node:24-alpine AS build
+ARG APP
+WORKDIR /w
+COPY --from=deps /w/node_modules ./node_modules
+COPY package.json ./
+COPY packages/api packages/api
+COPY apps/${APP} apps/${APP}
+ENV NEXT_TELEMETRY_DISABLED=1
+# NEXT_PUBLIC_* values are inlined at build time (the customer web app's development-card flag); leave them unset for production
+RUN npm run build --workspace=ridehail-${APP}
+
+# ---- run ----
+FROM node:24-alpine
+ARG APP
+RUN addgroup -S app && adduser -S app -G app
+WORKDIR /srv
+ENV NODE_ENV=production NEXT_TELEMETRY_DISABLED=1 HOSTNAME=0.0.0.0 APP=${APP}
+# the standalone output carries the server and the modules it needs, laid out as in the workspace; static files and public/
+# are copied beside it
+COPY --from=build --chown=app:app /w/apps/${APP}/.next/standalone ./
+COPY --from=build --chown=app:app /w/apps/${APP}/.next/static ./apps/${APP}/.next/static
+COPY --from=build --chown=app:app /w/apps/${APP}/public ./apps/${APP}/public
+USER app
+EXPOSE 3000
+ENV PORT=3000
+HEALTHCHECK --interval=15s --timeout=3s --start-period=20s --retries=5 \
+  CMD wget -qO- http://127.0.0.1:3000/login >/dev/null || exit 1
+CMD ["sh", "-c", "exec node apps/${APP}/server.js"]

@@ -15,6 +15,8 @@ public interface DisputeRepository extends JpaRepository<Dispute, UUID> {
 
     List<Dispute> findByStatusIn(Collection<DisputeStatus> statuses);
 
+    long countByStatus(DisputeStatus status);
+
     boolean existsByCustomerIdAndStatus(UUID customerId, DisputeStatus status);
 
     List<Dispute> findByTripId(UUID tripId);

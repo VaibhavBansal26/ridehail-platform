@@ -32,3 +32,12 @@ ridehail:
     api-key: ${STRIPE_API_KEY}                 # no defaults: startup fails fast if any is missing
     webhook-secret: ${STRIPE_WEBHOOK_SECRET}
     publishable-key: ${STRIPE_PUBLISHABLE_KEY}
+
+management:
+  server:
+    # metrics on their own port, reachable only from the monitoring network: the public port has no /actuator/prometheus at all
+    port: ${MANAGEMENT_PORT:9090}
+  endpoint:
+    health:
+      probes:
+        enabled: true   # /actuator/health/liveness and /readiness for an orchestrator

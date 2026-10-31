@@ -41,6 +41,10 @@ jobs:
         run: docker build -t ridehail-platform:ci .
       - name: Build admin panel image
         run: docker build -t ridehail-admin-web:ci admin-web
+      - name: Build the rider and customer web images
+        run: |
+          docker build -f clients/Dockerfile.web --build-arg APP=rider-web -t ridehail-rider-web:ci clients
+          docker build -f clients/Dockerfile.web --build-arg APP=customer-web -t ridehail-customer-web:ci clients
 
   # The admin panel is checked on its own: lint, types, unit tests (which include the API contract fixtures the backend
   # tests also check) and a production build.

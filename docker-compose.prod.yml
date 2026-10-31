@@ -1,0 +1,110 @@
+# A production-SHAPED stack: the same topology as docker-compose.yml, but with the "prod" Spring profile (real secrets required,
+# the simulated payment gateway cannot load), the three web apps, and Prometheus with the alert rules. Use it as the reference
+# for what a deployment needs; on a managed platform each service becomes that platform's equivalent.
+#
+#   cp .env.production.example .env.production      # fill in every value
+#   docker compose -f docker-compose.yml -f docker-compose.prod.yml --env-file .env.production up -d --build
+#
+# NOT in this file, on purpose:
+#   - TLS. Put a TLS terminator (a cloud load balancer, Caddy, or nginx with certificates) in front of the gateway and the web
+#     apps. Everything here listens on 127.0.0.1 only, for that terminator to proxy to.
+#   - A production database. Postgres below is for completeness; use a managed Postgres with backups and point DB_URL at it.
+#   - Secrets management. The values come from the environment; in production inject them from your platform's secret store.
+name: ridehail-platform
+
+x-app-prod-env: &app-prod-env
+  SPRING_PROFILES_ACTIVE: prod
+  DB_URL: ${DB_URL:-jdbc:postgresql://postgres:5432/ridehail}
+  DB_USER: ${DB_USER:-ridehail}
+  DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD}
+  JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET (32+ random bytes)}
+  ADMIN_PASSWORD: ${ADMIN_PASSWORD:?set ADMIN_PASSWORD (long and random)}
+  ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:?set ALLOWED_ORIGINS (the https origins of the web apps)}
+  STRIPE_API_KEY: ${STRIPE_API_KEY:?set STRIPE_API_KEY}
+  STRIPE_WEBHOOK_SECRET: ${STRIPE_WEBHOOK_SECRET:?set STRIPE_WEBHOOK_SECRET (one whsec_ per webhook endpoint, comma separated)}
+  STRIPE_PUBLISHABLE_KEY: ${STRIPE_PUBLISHABLE_KEY:?set STRIPE_PUBLISHABLE_KEY}
+  STRIPE_ONBOARDING_RETURN_URL: ${STRIPE_ONBOARDING_RETURN_URL:?set STRIPE_ONBOARDING_RETURN_URL}
+  STRIPE_ONBOARDING_REFRESH_URL: ${STRIPE_ONBOARDING_REFRESH_URL:?set STRIPE_ONBOARDING_REFRESH_URL}
+  STRIPE_CARD_RETURN_URL: ${STRIPE_CARD_RETURN_URL:?set STRIPE_CARD_RETURN_URL}
+  STRIPE_CARD_CANCEL_URL: ${STRIPE_CARD_CANCEL_URL:?set STRIPE_CARD_CANCEL_URL}
+  RIDEHAIL_STRIPE_CONNECT_COUNTRY: ${RIDEHAIL_STRIPE_CONNECT_COUNTRY:-}
+  REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD}
+  RABBITMQ_PASSWORD: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD}
+  MANAGEMENT_PORT: "9090"
+
+services:
+  postgres:
+    environment:
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD}
+    ports: !reset []              # not reachable from the host
+
+  redis:
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD:?set REDIS_PASSWORD}
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD}", "--save", "", "--appendonly", "no"]
+
+  rabbitmq:
+    environment:
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:?set RABBITMQ_PASSWORD}
+
+  app-a:
+    environment: *app-prod-env
+  app-b:
+    environment: *app-prod-env
+
+  gateway:
+    ports: !override
+      - "127.0.0.1:${APP_PORT:-8080}:80"     # the TLS terminator proxies to this
+
+  admin:
+    environment:
+      BACKEND_URL: http://gateway
+      ALLOW_INSECURE_COOKIES: "false"        # production cookies are Secure: this must be served over https
+    ports: !override
+      - "127.0.0.1:${ADMIN_PORT:-3000}:3000"
+
+  rider-web:
+    build:
+      context: ./clients
+      dockerfile: Dockerfile.web
+      args: {APP: rider-web}
+    image: ridehail-rider-web:prod
+    depends_on:
+      gateway: {condition: service_healthy}
+    environment:
+      BACKEND_URL: http://gateway
+      REALTIME_URL: ${PUBLIC_REALTIME_URL:?set PUBLIC_REALTIME_URL (wss://api.example.com/ws)}
+      ALLOW_INSECURE_COOKIES: "false"
+    ports:
+      - "127.0.0.1:${RIDER_WEB_PORT:-3001}:3000"
+
+  customer-web:
+    build:
+      context: ./clients
+      dockerfile: Dockerfile.web
+      args: {APP: customer-web}
+    image: ridehail-customer-web:prod
+    depends_on:
+      gateway: {condition: service_healthy}
+    environment:
+      BACKEND_URL: http://gateway
+      REALTIME_URL: ${PUBLIC_REALTIME_URL:?set PUBLIC_REALTIME_URL (wss://api.example.com/ws)}
+      ALLOW_INSECURE_COOKIES: "false"
+      # DEV_CARD_SHORTCUT is deliberately not set: the "use a test card" button must never exist in production
+    ports:
+      - "127.0.0.1:${CUSTOMER_WEB_PORT:-3002}:3000"
+
+  prometheus:
+    image: prom/prometheus:v2.55.1
+    volumes:
+      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./docker/prometheus/alerts.yml:/etc/prometheus/alerts.yml:ro
+      - promdata:/prometheus
+    depends_on:
+      - app-a
+      - app-b
+    ports:
+      - "127.0.0.1:${PROMETHEUS_PORT:-9091}:9090"
+
+volumes:
+  promdata:

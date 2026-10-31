@@ -10,13 +10,14 @@ A ride-sharing platform. This repository holds the Spring Boot 3 (Java 21) backe
 - **Stripe:** charges, refunds, Connect payouts and signed webhooks behind a `PaymentGateway` port (simulated gateway for dev/tests).
 - **Customer and rider apps:** a shared, tested TypeScript client for the API and WebSockets is in [`clients/`](clients) (rider and customer apps, Next.js and Expo).
 - **Admin panel:** live ops map, trips, riders, payments, disputes and incidents with a "needs attention" summary ([docs/ADMIN_PANEL.md](docs/ADMIN_PANEL.md)).
+- **Operations:** a production-shaped stack, Prometheus alerts for the things that cost money, backups with a restore drill, a load test and a runbook ([docs/DEPLOYMENT.md](docs/DEPLOYMENT.md)).
 - **Disputes & provider problems:** chargebacks are recorded, the rider's share is frozen in the ledger and settled when decided; failed bank payouts, reversed transfers and failed refunds become admin incidents ([docs/DISPUTES.md](docs/DISPUTES.md)).
 
 ## Run
 
 ```bash
 mvn spring-boot:run      # in-memory H2, simulated payment gateway, dev-only secrets
-mvn test                 # 310 tests (H2; plus tests against a real Redis, RabbitMQ and Postgres when Docker is available)
+mvn test                 # 314 tests (H2; plus tests against a real Redis, RabbitMQ and Postgres when Docker is available)
 docker compose up --build   # TWO instances + Postgres, RabbitMQ, Redis, an nginx gateway on http://localhost:8080 and the admin panel on http://localhost:3000
 DEMO_DATA=true docker compose up --build   # the same, with a demo city loaded so the panel has something to show
 ```
@@ -33,7 +34,7 @@ triggers, row locking) when you point them at one:
 
 ```bash
 docker run -d --name pg -e POSTGRES_DB=ridehail -e POSTGRES_USER=ridehail -e POSTGRES_PASSWORD=ridehail -p 5432:5432 postgres:16-alpine
-RIDEHAIL_TEST_PG_URL=jdbc:postgresql://localhost:5432/ridehail mvn test   # 310 tests, none skipped
+RIDEHAIL_TEST_PG_URL=jdbc:postgresql://localhost:5432/ridehail mvn test   # 314 tests, none skipped
 ```
 
 CI (`.github/workflows/ci.yml`) does exactly this against a Postgres service container, checks the admin panel (lint, types, 93 tests, production build), builds both Docker images, and brings up the

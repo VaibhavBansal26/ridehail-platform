@@ -17,6 +17,7 @@ USER app
 EXPOSE 8080
 # size the heap from the container's memory limit; die cleanly on OOM so the orchestrator restarts us
 ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75 -XX:+ExitOnOutOfMemoryError"
-HEALTHCHECK --interval=15s --timeout=3s --start-period=45s --retries=5 \
-  CMD wget -qO- http://localhost:8080/actuator/health | grep -q '"UP"' || exit 1
+# /api/health is on the serving port in every profile (in production /actuator moves to an internal port)
+HEALTHCHECK --interval=15s --timeout=3s --start-period=90s --retries=5 \
+  CMD wget -qO- http://localhost:8080/api/health | grep -q '"UP"' || exit 1
 ENTRYPOINT ["java", "-jar", "/app/app.jar"]

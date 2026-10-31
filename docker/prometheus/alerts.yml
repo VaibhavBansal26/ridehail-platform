@@ -1,0 +1,93 @@
+# What should wake a person, and why. Thresholds are starting points: tune them against real traffic.
+groups:
+  - name: ridehail-money
+    rules:
+      - alert: LedgerUnbalanced
+        expr: min(ridehail_ledger_balanced) < 1
+        for: 1m
+        labels: {severity: page}
+        annotations:
+          summary: "Ledger debits and credits differ"
+          description: "The books are wrong. Stop payouts and refunds and investigate before anything else (see the runbook)."
+
+      - alert: PaymentsNeedAttention
+        expr: max(ridehail_payments{status="REQUIRES_ATTENTION"}) > 0
+        for: 15m
+        labels: {severity: page}
+        annotations:
+          summary: "A customer's charge failed and is waiting for a person"
+          description: "Admin panel > Payments: the card was declined or the provider gave up. Customers with one cannot book."
+
+      - alert: PayoutsNeedAttention
+        expr: max(ridehail_payouts{status="REQUIRES_ATTENTION"}) > 0
+        for: 15m
+        labels: {severity: page}
+        annotations:
+          summary: "A rider payout is in an unknown state"
+          description: "A transfer may or may not have gone out. Check the provider's dashboard before retrying."
+
+      - alert: ChargebackOpen
+        expr: max(ridehail_disputes_open) > 0
+        for: 5m
+        labels: {severity: page}
+        annotations:
+          summary: "A card dispute is open"
+          description: "Evidence must be submitted in the Stripe Dashboard before the deadline or the dispute is lost by default."
+
+      - alert: FinanceIncidentOpen
+        expr: max(ridehail_incidents_open) > 0
+        for: 30m
+        labels: {severity: ticket}
+        annotations:
+          summary: "A failed bank payout, reversed transfer or failed refund is waiting for a person"
+
+      - alert: PayoutsWaitingForFundsTooLong
+        expr: max(ridehail_payouts{status="AWAITING_FUNDS"}) > 0
+        for: 3d
+        labels: {severity: ticket}
+        annotations:
+          summary: "Riders have waited days for platform funds to settle"
+          description: "Compare the platform's available balance at the provider with what riders are waiting for (admin panel > Overview)."
+
+      - alert: PaymentsBacklog
+        expr: max(ridehail_payments{status="PENDING"}) > 20
+        for: 10m
+        labels: {severity: page}
+        annotations:
+          summary: "Charges are piling up unprocessed"
+          description: "The provider may be down or rejecting our key. Look for 'Stripe rejected our API key' in the logs."
+
+  - name: ridehail-service
+    rules:
+      - alert: InstanceDown
+        expr: up{job="ridehail-app"} == 0
+        for: 2m
+        labels: {severity: page}
+        annotations:
+          summary: "An application instance is not answering its metrics port"
+
+      - alert: HighServerErrorRate
+        expr: |
+          sum(rate(http_server_requests_seconds_count{status=~"5.."}[5m]))
+            / clamp_min(sum(rate(http_server_requests_seconds_count[5m])), 1) > 0.02
+        for: 5m
+        labels: {severity: page}
+        annotations:
+          summary: "More than 2% of requests are failing with a server error"
+
+      - alert: SlowRequests
+        expr: |
+          histogram_quantile(0.95, sum by (le) (rate(http_server_requests_seconds_bucket{uri!~"/actuator.*"}[5m]))) > 1
+        for: 10m
+        labels: {severity: ticket}
+        annotations:
+          summary: "95th percentile request time is over a second"
+          description: "Needs http.server.requests percentile histograms (management.metrics.distribution.percentiles-histogram.http.server.requests=true)."
+
+      - alert: NoTripsCompleting
+        expr: sum(increase(ridehail_ride_events_total{type="TRIP_REQUESTED"}[30m])) > 5 and sum(increase(ridehail_ride_events_total{type="TRIP_ACCEPTED"}[30m])) == 0
+        for: 5m
+        labels: {severity: page}
+        annotations:
+          summary: "Customers are requesting rides and no rider is accepting"
+          description: "Dispatch or the realtime push may be broken, or there are no riders online."
