@@ -46,9 +46,12 @@ class ClientApiContractTest extends ApiTestBase {
 
         // the rider's side
         JsonNode offers = fetch("/api/riders/me/offers", rider);
+        assertThat(offers.get(0).get("fare").decimalValue()).isEqualByComparingTo(quote.get("total").decimalValue());
+        assertThat(offers.get(0).get("pickupLat").asDouble()).isEqualTo(PICKUP_LAT);
         check("offers.json", offers);
         call(HttpMethod.POST, "/api/riders/me/offers/" + offers.get(0).get("offerId").asText() + "/accept", rider, null);
         check("trip-accepted.json", fetch("/api/trips/" + trip, customer));
+        check("trip-active.json", fetch("/api/trips/active", rider));
 
         // live position
         call(HttpMethod.PUT, "/api/riders/me/location", rider, "{\"lat\":12.9720,\"lon\":77.5950,\"heading\":90}");

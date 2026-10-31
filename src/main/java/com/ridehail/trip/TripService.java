@@ -79,6 +79,19 @@ public class TripService {
         return t;
     }
 
+    /**
+     * The trip this customer or rider is in right now, so an app that was closed (or reloaded) can pick up where it was.
+     * Empty when there is none; admins have none.
+     */
+    @Transactional(readOnly = true)
+    public java.util.Optional<Trip> activeFor(UUID profileId, com.ridehail.security.Role role) {
+        return switch (role) {
+            case CUSTOMER -> trips.findFirstByCustomerIdAndStatusIn(profileId, activeStatuses());
+            case RIDER -> trips.findFirstByRiderIdAndStatusIn(profileId, activeStatuses());
+            default -> java.util.Optional.empty();
+        };
+    }
+
     public record RiderPosition(UUID tripId, TripStatus status, double lat, double lon, Instant at) {}
 
     /**

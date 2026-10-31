@@ -62,7 +62,7 @@ jobs:
       - run: npm test
       - run: npm run build
 
-  # The shared client package behind the customer and rider apps: types, unit tests, the API contract fixtures (which the
+  # The shared client package and the web apps built on it: types, unit tests, the API contract fixtures (which the
   # backend tests also check), then a whole ride through it against the real API over HTTP and STOMP WebSockets.
   clients:
     runs-on: ubuntu-latest
@@ -83,6 +83,9 @@ jobs:
       - run: npm run typecheck
         working-directory: clients
       - run: npm test
+        working-directory: clients
+      - name: Rider web app, lint and production build
+        run: npm run lint --workspace ridehail-rider-web && npm run build --workspace ridehail-rider-web
         working-directory: clients
       - name: A ride through the shared client against the running API
         run: |

@@ -13,6 +13,10 @@ const trip = {
   fare: 9.99,
   surgeMultiplier: 1,
   currency: "USD",
+  pickupLat: 12.97,
+  pickupLon: 77.59,
+  dropLat: 12.93,
+  dropLon: 77.62,
 };
 const authResult = { accessToken: "A2", refreshToken: "R2", role: "RIDER", profileId: "r1" };
 
@@ -65,6 +69,14 @@ describe("requests", () => {
     expect(err.isRateLimited).toBe(true);
     expect(err.retryAfterSeconds).toBe(3);
     expect(err.message).toBe("Too many location updates");
+  });
+
+  it("finds the active trip, or null when the server says there is none", async () => {
+    const some = setup(() => json(trip));
+    expect((await some.api.trips.active())?.id).toBe("t1");
+    expect(some.calls[0]!.url).toBe(`${BASE}/api/trips/active`);
+    const none = setup(() => new Response(null, { status: 204 }));
+    expect(await none.api.trips.active()).toBeNull();
   });
 
   it("accepts an offer from a 204 with no body", async () => {

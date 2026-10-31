@@ -5,13 +5,14 @@ Four apps on one shared client, in an npm workspace:
 | Path | What | Status |
 |---|---|---|
 | `packages/api` | `@ridehail/api`: typed REST client, token refresh, STOMP realtime, zod schemas | **built, tested** |
+| `apps/rider-web` | Next.js rider app | **built, tested** ([below](#rider-web)) |
 | `apps/rider-mobile`, `apps/customer-mobile` | Expo / React Native | not started |
-| `apps/rider-web`, `apps/customer-web` | Next.js | not started |
+| `apps/customer-web` | Next.js customer app | not started |
 
 ```bash
 cd clients
 npm install
-npm run typecheck && npm test                                   # 35 tests; the live ride below is skipped
+npm run typecheck && npm test                                   # 36 package tests + 99 rider-web tests; the live ride below is skipped
 RIDEHAIL_E2E_URL=http://localhost:8080 npm test --workspace @ridehail/api   # with the API running: a whole ride
 ```
 
@@ -64,3 +65,25 @@ package's tests then say what to update.
   `customer.startCardSetup()` to Stripe's SDK; the rider app opens the `url` from `rider.startPayoutOnboarding()`.
   With the Stripe provider the API refuses client-supplied tokens, so there is no shortcut to build.
 - **Money is shown from the server's numbers** (`fare`, `total`, `available`), never recomputed on the device.
+
+## rider-web
+
+`apps/rider-web` (port 3001): sign in or create a rider account, go online, get offers by push with a countdown, accept, run
+the trip (arrived, start, complete, with a navigate link to the pickup and drop-off), and see earnings, withdraw, and set up payouts.
+
+```bash
+cp apps/rider-web/.env.example apps/rider-web/.env.local   # BACKEND_URL, ALLOW_INSECURE_COOKIES=true for plain-http local use
+npm run dev --workspace ridehail-rider-web                 # http://localhost:3001, with the API on :8080
+```
+
+- **Security model** is the admin panel's: an `httpOnly` cookie session behind a same-origin BFF, a CSP nonce, a custom-header +
+  Origin check on every call. The BFF only forwards the rider endpoints it lists (`lib/allow.ts`), refuses sessions that are
+  not `RIDER`, and answers a customer's or admin's sign-in exactly like a wrong password.
+- **Position.** While online the browser's position is sent every 4 s (the server accepts about 1/s and drops the rest; on a
+  429 the app waits as long as `Retry-After` says). If the browser cannot supply one, the rider can set a position by hand
+  (kept for the tab), and a warning explains that dispatch can no longer see them. **A web page only reports while it is open
+  and in front**, which is the reason a phone app (`rider-mobile`) exists: it can keep reporting with the screen off.
+- **Pushes mean "refetch"**: offers, cancellations and earnings arrive over the WebSocket, and each push (and every reconnect)
+  makes the app read the truth over REST. Everything also polls slowly in case a push is lost.
+- Backend additions this needed: `GET /api/trips/active` (find the current trip again after a reload), pickup/drop coordinates
+  on trips, and the fare and coordinates on `GET /api/riders/me/offers`.

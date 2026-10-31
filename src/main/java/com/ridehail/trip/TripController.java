@@ -8,6 +8,7 @@ import jakarta.validation.constraints.NotNull;
 import java.math.BigDecimal;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
@@ -26,10 +27,12 @@ class TripController {
     record BookRequest(@NotNull UUID quoteId) {}
 
     record TripResponse(UUID id, TripStatus status, UUID customerId, UUID riderId, VehicleType vehicleType,
-                        BigDecimal fare, BigDecimal surgeMultiplier, String currency) {
+                        BigDecimal fare, BigDecimal surgeMultiplier, String currency,
+                        double pickupLat, double pickupLon, double dropLat, double dropLon) {
         static TripResponse of(Trip t) {
             return new TripResponse(t.getId(), t.getStatus(), t.getCustomerId(), t.getRiderId(),
-                    t.getVehicleType(), t.getFare(), t.getSurgeMultiplier(), t.getCurrency());
+                    t.getVehicleType(), t.getFare(), t.getSurgeMultiplier(), t.getCurrency(),
+                    t.getPickupLat(), t.getPickupLon(), t.getDropLat(), t.getDropLon());
         }
     }
 
@@ -38,6 +41,14 @@ class TripController {
     @ResponseStatus(HttpStatus.CREATED)
     TripResponse book(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody BookRequest r) {
         return TripResponse.of(trips.request(CurrentUser.profileId(jwt), r.quoteId()));
+    }
+
+    /** The caller's current trip (customer or rider), or 204 when there is none. */
+    @GetMapping("/active")
+    ResponseEntity<TripResponse> active(@AuthenticationPrincipal Jwt jwt) {
+        return trips.activeFor(CurrentUser.profileId(jwt), CurrentUser.role(jwt))
+                .map(t -> ResponseEntity.ok(TripResponse.of(t)))
+                .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
     @GetMapping("/{id}")

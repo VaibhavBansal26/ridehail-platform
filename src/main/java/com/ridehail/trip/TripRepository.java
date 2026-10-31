@@ -20,5 +20,8 @@ public interface TripRepository extends JpaRepository<Trip, UUID> {
 
     long countByStatus(TripStatus status);
 
+    /** The customer's current trip, if any (booking is refused while one is going on). */
+    Optional<Trip> findFirstByCustomerIdAndStatusIn(UUID customerId, Collection<TripStatus> statuses);
+
     boolean existsByCustomerIdAndStatusIn(UUID customerId, Collection<TripStatus> statuses);
 }

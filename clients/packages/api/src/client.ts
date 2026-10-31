@@ -105,6 +105,8 @@ export function createApi(opts: ApiOptions) {
     trips: {
       book: (quoteId: string) => post("/api/trips", Trip, { quoteId }),
       get: (id: string) => get(`/api/trips/${id}`, Trip),
+      /** The trip this person is in right now (customer or rider), or null. How an app that was closed finds its place again. */
+      active: async () => (await get("/api/trips/active", Trip.optional())) ?? null,
       /** Customer: where the rider is now. 409 if the trip is not active, 404 if the rider has not reported yet. */
       riderLocation: (id: string) => get(`/api/trips/${id}/rider-location`, RiderLocation),
       cancel: (id: string) => post(`/api/trips/${id}/cancel`, Trip),

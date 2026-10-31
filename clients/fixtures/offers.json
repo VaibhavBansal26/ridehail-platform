@@ -1,6 +1,13 @@
 [ {
-  "offerId" : "c7ff7a2a-86a4-450d-8744-d7444e4fa566",
-  "tripId" : "57b943f1-d1ad-4bce-92cd-e18f08c09b48",
+  "offerId" : "71b685f6-6886-420b-a422-96c077a11ad5",
+  "tripId" : "902dcd72-471d-48e0-958b-0a77f57cc5a8",
   "distanceToPickupKm" : 0.5559754011677515,
-  "expiresAt" : "2026-10-30T23:35:16.562575Z"
+  "expiresAt" : "2026-10-31T00:06:55.981541Z",
+  "fare" : 9.99,
+  "currency" : "USD",
+  "surgeMultiplier" : 1.0,
+  "pickupLat" : 12.9716,
+  "pickupLon" : 77.5946,
+  "dropLat" : 12.9352,
+  "dropLon" : 77.6245
 } ]

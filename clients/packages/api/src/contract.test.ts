@@ -18,6 +18,7 @@ const cases: [string, z.ZodType][] = [
   ["quote.json", Quote],
   ["trip-requested.json", Trip],
   ["trip-accepted.json", Trip],
+  ["trip-active.json", Trip],
   ["trip-completed.json", Trip],
   ["rider-location.json", RiderLocation],
   ["earnings.json", Earnings],

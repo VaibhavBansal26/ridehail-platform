@@ -87,6 +87,10 @@ export const Trip = z.object({
   fare: money,
   surgeMultiplier: money,
   currency: z.string(),
+  pickupLat: z.number(),
+  pickupLon: z.number(),
+  dropLat: z.number(),
+  dropLon: z.number(),
 });
 export type Trip = z.infer<typeof Trip>;
 
@@ -104,6 +108,13 @@ export const Offer = z.object({
   tripId: z.string(),
   distanceToPickupKm: z.number(),
   expiresAt: instant,
+  fare: money,
+  currency: z.string(),
+  surgeMultiplier: money,
+  pickupLat: z.number(),
+  pickupLon: z.number(),
+  dropLat: z.number(),
+  dropLon: z.number(),
 });
 export type Offer = z.infer<typeof Offer>;
 
