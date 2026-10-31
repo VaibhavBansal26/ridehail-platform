@@ -19,7 +19,14 @@ name below differs slightly, search for the term in italics.
 - [ ] **1.1 Copy the API keys.** *Developers → API keys*: the **secret key** (`sk_test_…`) and **publishable key** (`pk_test_…`).
   Test mode accepts the plain secret key. Before going live, switch to a restricted key (section 6).
 - [ ] **1.2 Turn on Connect.** *Connect → Get started*. Choose **platform or marketplace**, and fill in the platform
-  profile it asks for. Riders are paid as **Express** accounts (Stripe hosts their identity and bank forms; we never see them).
+  profile it asks for. Riders are paid as **Accounts v2** connected accounts with the Express dashboard (Stripe hosts their
+  identity and bank forms; we never see them).
+- [ ] **1.2b Accept the loss-liability acknowledgement.** *Settings → Connect → Platform profile*
+  (`dashboard.stripe.com/settings/connect/platform-profile`, in the sandbox). The app charges customers on the platform and
+  transfers to riders ("separate charges and transfers"), which makes **your platform responsible for losses** on negative
+  connected-account balances (for example a chargeback after the rider withdrew). Stripe refuses to create connected accounts
+  until you accept this. Without it onboarding fails with a `502` and the log says *"…your platform as the losses collector. Use Accounts v2…"*.
+  Read the text before accepting: in live mode this is a real business exposure.
 - [ ] **1.3 Note your platform's country** (*Settings → Business details*). Riders must be in the same country as the
   platform for this integration; see "Known gaps" at the end. Set `RIDEHAIL_STRIPE_CONNECT_COUNTRY` to its two-letter code (e.g. `US`).
 - [ ] **1.4 Check cards are enabled.** *Settings → Payment methods*: **Cards** on.
@@ -95,15 +102,35 @@ Add `.env.stripe` and `data/` to `.gitignore`. To start over from scratch, delet
 ## 3. Local webhooks with the Stripe CLI
 
 - [ ] **3.1** Install and log in: `brew install stripe/stripe-cli/stripe`, then `stripe login`. Make sure you're pointing at your test account.
+  (If Homebrew complains that your Command Line Tools are too old, download the macOS binary from
+  `github.com/stripe/stripe-cli/releases` instead and check it against the release's checksums file.) If the CLI's saved
+  login is rejected with `403 Permission denied` (it can go stale), skip it: pass your **test** key with
+  `source .env.stripe && stripe listen --api-key "$STRIPE_API_KEY" …`. Keep it a `sk_test_` key.
 - [ ] **3.2** In a dedicated terminal, forward **both** event scopes to the app and leave it running:
 
   ```bash
   stripe listen \
+    --events payment_intent.succeeded,setup_intent.succeeded,account.updated,account.external_account.created,account.external_account.updated,balance.available,payout.failed,refund.failed,transfer.reversed,charge.dispute.created,charge.dispute.updated,charge.dispute.closed,charge.dispute.funds_withdrawn,charge.dispute.funds_reinstated \
     --forward-to         localhost:8080/api/webhooks/stripe \
     --forward-connect-to localhost:8080/api/webhooks/stripe
   ```
 
-  It prints `Ready! Your webhook signing secret is whsec_…`. Put that value in `STRIPE_WEBHOOK_SECRET`
+  Current CLI versions refuse to start without `--events` (or `--all-snapshot`); the list above is every event the
+  app acts on.
+
+  Riders' accounts also send **v2 events** (`v2.core.account[…]`), and the CLI will not forward snapshot and v2 events to the same
+  destination, so run a **second** listener in another terminal for those:
+
+  ```bash
+  stripe listen \
+    --events 'v2.core.account[configuration.recipient].capability_status_updated,v2.core.account[configuration.recipient].updated,v2.core.account[requirements].updated' \
+    --forward-to localhost:8080/api/webhooks/stripe
+  ```
+
+  The app answers a v2 event by asking Stripe whether that rider's account can be paid (transfers and payouts both active).
+  Both listeners print the same `whsec_…`.
+
+  Each listener prints `Ready! Your webhook signing secret is whsec_…`. Put that value in `STRIPE_WEBHOOK_SECRET`
   (one secret covers both scopes while using the CLI). Every forwarded event shows up in this terminal with the
   HTTP status the app returned. **`[200]` is what you want to see.**
 - [ ] **3.3** Start the app with the environment loaded:
@@ -215,10 +242,11 @@ json() { curl -sS -H 'Content-Type: application/json' "$@"; }   # prints the res
 - [ ] **D1. Start onboarding:**
 
   ```bash
-  json -X POST $API/api/riders/me/payout-account/onboarding -H "$(auth $RT)" | jq .
+  json -X POST $API/api/riders/me/payout-account/onboarding -H "$(auth $RT)" -d '{"email":"test-rider@example.com"}' | jq .
   ```
 
-  Expect a `url` on `connect.stripe.com`. *Dashboard → Connect → Accounts* shows a new Express account (restricted, onboarding incomplete).
+  The rider's contact **email** is required the first time (Stripe will not create the account without one): without it you get `400`.
+  Resuming later does not need it. Expect a `url` on `connect.stripe.com` (it expires after about 5 minutes; call again for a fresh one). *Dashboard → Connect → Accounts* shows a new Express account (restricted, onboarding incomplete).
 - [ ] **D2. Withdrawals are blocked until onboarding finishes:**
 
   ```bash
@@ -238,9 +266,10 @@ json() { curl -sS -H 'Content-Type: application/json' "$@"; }   # prints the res
   | Business website | `https://accessible.stripe.com` |
   | Bank account (US) | routing `110000000`, account `000123456789` |
 
-  Test mode also shows shortcuts such as "Use test account" on some screens; use whichever your screens offer.
+  Test mode also shows shortcuts such as "Use test account" on some screens; use whichever your screens offer. At the end
+  Stripe offers to save the account with **Link**: choose **Finish without saving** (Link rejects the all-zeros test phone number).
 - [ ] **D4. The app learns the rider can be paid:** in the `stripe listen` terminal expect `account.updated` → `[200]`
-  (possibly several, as Stripe verifies things). Then:
+  (possibly several, as Stripe verifies things), and in the second listener `v2.core.account[…]` events → `[200]`. Then:
 
   ```bash
   json $API/api/riders/me/earnings -H "$(auth $RT)" | jq '{available, hasPayoutAccount}'
@@ -377,6 +406,10 @@ You're done when A1–A3, B1, C1–C4, D1–D4, E1–E4, F1, G1 all behaved as s
 | `stripe listen` shows `[400]` for every event | The app has the wrong secret. Copy the `whsec_…` that `stripe listen` printed *this session* into `STRIPE_WEBHOOK_SECRET` and restart the app. |
 | Deployed endpoint gets `400` for some events only | Missing the second secret. `account.updated` and `payout.failed` come from endpoint B; its secret must be in `STRIPE_WEBHOOK_SECRET` too (comma-separated). |
 | A proxy or load balancer in front of the app and signatures fail | Something is modifying the request body. Signatures are computed over the exact bytes Stripe sent; make sure nothing rewrites, re-encodes or compresses the body. |
+| Onboarding `502`, log says *"…platform as the losses collector. Use Accounts v2…"* | The loss-liability acknowledgement (1.2b) has not been accepted in the Dashboard. |
+| Onboarding `502`, log says *"…the Account must have a contact email"* | The request had no `email` (D1). The rider apps ask for it. |
+| `stripe listen` fails with `403 Permission denied` | The CLI's saved login is stale. Run `stripe logout` then `stripe login`, or use `--api-key` (3.1). |
+| `stripe listen` says it "cannot forward both snapshot and thin events to the same destination" | Run two listeners (3.2): one for normal events, one for the `v2.core.account[…]` events. |
 | `account.updated` never arrives locally | You started `stripe listen` without `--forward-connect-to`. Connected-account events are only forwarded with that flag. |
 | `account.updated` never arrives when deployed | Endpoint B was created as *Your account* instead of *Connected accounts*. |
 | Rider stays `hasPayoutAccount: false` | Onboarding isn't finished (Stripe still needs details) or the bank step was skipped. Open a fresh link with D1 and look at *Connect → Accounts → the account → Requirements*. |
@@ -441,4 +474,9 @@ You're done when A1–A3, B1, C1–C4, D1–D4, E1–E4, F1, G1 all behaved as s
   tried against a real Stripe account yet: make a test dispute (card `4000000000000259`) and answer it from the panel. Reversed transfers and failed refunds are
   raised as incidents for a person; we do not repair the books automatically. See [DISPUTES.md](DISPUTES.md) for the details and
   what is deliberately left manual.
+- **Riders without an email cannot start payout setup.** The apps collect it when the rider taps "Set up payouts", and Stripe uses it
+  for account notices. It is not stored by us.
+- **What was run against real Stripe (test mode), 2026-10-31:** phases A to D (including real hosted onboarding), E (charge), F (transfer
+  to a v2 rider account), G (refund), H1 (decline and recovery), H2 (bad key, then retry without double charge) and H3 (payout waits
+  for funds). **Not run:** H4 (resend from the Dashboard; covered by an automated test), H5, and answering a test dispute from the admin panel.
 - **Not covered by any automated test:** the real Stripe network. Everything above exists to cover that.

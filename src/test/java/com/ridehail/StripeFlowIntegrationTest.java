@@ -183,28 +183,40 @@ class StripeFlowIntegrationTest extends ApiTestBase {
     @Test
     void ridersCanOnlyBePaidOnceTheProviderSaysTheirAccountCanReceiveFunds() throws Exception {
         Actor rider = onlineRider("Asha", 0.005);
-        stub.reply("POST /v1/accounts", 200, "{\"id\":\"acct_asha\",\"object\":\"account\"}");
-        stub.reply("POST /v1/account_links", 200,
-                "{\"object\":\"account_link\",\"created\":1,\"expires_at\":1893456000,\"url\":\"https://connect.stripe.com/setup/e/asha\"}");
+        stub.reply("POST /v2/core/accounts", 200, "{\"id\":\"acct_asha\",\"object\":\"v2.core.account\"}");
+        stub.reply("POST /v2/core/account_links", 200, v2Link("acct_asha", "https://connect.stripe.com/setup/e/asha"));
 
-        JsonNode onboarding = body(call(HttpMethod.POST, "/api/riders/me/payout-account/onboarding", rider, null).andExpect(status().isOk()));
+        // Stripe needs a contact address to create the account, and riders have none on file
+        call(HttpMethod.POST, "/api/riders/me/payout-account/onboarding", rider, null).andExpect(status().isBadRequest());
+        call(HttpMethod.POST, "/api/riders/me/payout-account/onboarding", rider, "{\"email\":\"not-an-email\"}").andExpect(status().isBadRequest());
+        assertThat(stub.calls("POST /v2/core/accounts")).isEmpty();
+
+        JsonNode onboarding = body(call(HttpMethod.POST, "/api/riders/me/payout-account/onboarding", rider, "{\"email\":\"asha@example.com\"}").andExpect(status().isOk()));
+        assertThat(stub.only("POST /v2/core/accounts").json().at("/contact_email").asText()).isEqualTo("asha@example.com");
         assertThat(onboarding.get("url").asText()).isEqualTo("https://connect.stripe.com/setup/e/asha");
 
         // a rider cannot point payouts at an arbitrary account
         call(HttpMethod.PUT, "/api/riders/me/payout-account", rider, "{\"token\":\"acct_someone_else\"}").andExpect(status().isForbidden());
 
         // onboarding started but incomplete
-        webhook("account.updated", "{\"id\":\"acct_asha\",\"payouts_enabled\":false}").andExpect(status().isOk());
+        stub.reply("GET /v2/core/accounts/acct_asha", 200, v2Account("acct_asha", "restricted", "restricted"));
+        thinAccountEvent("acct_asha").andExpect(status().isOk());
         assertThat(riderRepo.findById(rider.id()).orElseThrow().getPayoutAccountToken()).isNull();
         call(HttpMethod.POST, "/api/riders/me/payouts", rider, null).andExpect(status().isConflict());
 
-        webhook("account.updated", "{\"id\":\"acct_asha\",\"payouts_enabled\":true}").andExpect(status().isOk());
+        stub.reply("GET /v2/core/accounts/acct_asha", 200, v2Account("acct_asha", "active", "active"));
+        thinAccountEvent("acct_asha").andExpect(status().isOk());
         assertThat(riderRepo.findById(rider.id()).orElseThrow().getPayoutAccountToken()).isEqualTo("acct_asha");
         assertThat(fetch("/api/riders/me/earnings", rider).get("hasPayoutAccount").asBoolean()).isTrue();
 
         // Stripe later restricts the account (e.g. verification lapsed)
-        webhook("account.updated", "{\"id\":\"acct_asha\",\"payouts_enabled\":false}").andExpect(status().isOk());
+        stub.reply("GET /v2/core/accounts/acct_asha", 200, v2Account("acct_asha", "active", "restricted"));
+        thinAccountEvent("acct_asha").andExpect(status().isOk());
         assertThat(riderRepo.findById(rider.id()).orElseThrow().getPayoutAccountToken()).isNull();
+
+        // if Stripe cannot be asked, the webhook fails so that Stripe redelivers it (nothing is marked processed)
+        stub.reply("GET /v2/core/accounts/acct_asha", 500, StubStripe.error("api_error", null, "boom"));
+        thinAccountEvent("acct_asha").andExpect(status().is5xxServerError());
     }
 
     @Test
@@ -577,11 +589,32 @@ class StripeFlowIntegrationTest extends ApiTestBase {
     /** An online rider whose connected account was onboarded the production way. */
     private Actor stripeRider(String name, String accountId) throws Exception {
         Actor r = onlineRider(name, 0.005);
-        stub.replyOnce("POST /v1/accounts", 200, "{\"id\":\"" + accountId + "\",\"object\":\"account\"}");
-        stub.replyOnce("POST /v1/account_links", 200, "{\"object\":\"account_link\",\"created\":1,\"expires_at\":1893456000,\"url\":\"https://x\"}");
-        call(HttpMethod.POST, "/api/riders/me/payout-account/onboarding", r, null).andExpect(status().isOk());
-        webhook("account.updated", "{\"id\":\"" + accountId + "\",\"payouts_enabled\":true}").andExpect(status().isOk());
+        stub.replyOnce("POST /v2/core/accounts", 200, "{\"id\":\"" + accountId + "\",\"object\":\"v2.core.account\"}");
+        stub.replyOnce("POST /v2/core/account_links", 200, v2Link(accountId, "https://x"));
+        call(HttpMethod.POST, "/api/riders/me/payout-account/onboarding", r, "{\"email\":\"" + name.toLowerCase() + "@example.com\"}").andExpect(status().isOk());
+        stub.reply("GET /v2/core/accounts/" + accountId, 200, v2Account(accountId, "active", "active"));
+        thinAccountEvent(accountId).andExpect(status().isOk());
         return r;
+    }
+
+    private static String v2Link(String account, String url) {
+        return "{\"object\":\"v2.core.account_link\",\"account\":\"" + account + "\",\"created\":\"2026-01-01T00:00:00.000Z\","
+                + "\"expires_at\":\"2030-01-01T00:00:00.000Z\",\"url\":\"" + url + "\"}";
+    }
+
+    private static String v2Account(String id, String transfers, String payouts) {
+        return "{\"id\":\"" + id + "\",\"object\":\"v2.core.account\",\"closed\":false,"
+                + "\"configuration\":{\"recipient\":{\"applied\":true,\"capabilities\":{\"stripe_balance\":{"
+                + "\"stripe_transfers\":{\"status\":\"" + transfers + "\"},\"payouts\":{\"status\":\"" + payouts + "\"}}}}}}";
+    }
+
+    /** What Stripe sends when a v2 account changes: a thin event that only names the account. */
+    private ResultActions thinAccountEvent(String account) throws Exception {
+        String payload = "{\"id\":\"evt_" + UUID.randomUUID() + "\",\"object\":\"v2.core.event\","
+                + "\"type\":\"v2.core.account[configuration.recipient].capability_status_updated\","
+                + "\"created\":\"2026-10-31T18:00:00.000Z\",\"livemode\":false,"
+                + "\"related_object\":{\"id\":\"" + account + "\",\"type\":\"v2.core.account\",\"url\":\"/v2/core/accounts/" + account + "\"}}";
+        return postRaw(payload, sign(payload, System.currentTimeMillis() / 1000, SECRET));
     }
 
     /** A completed, captured ride on Stripe: customer cus_ravi, rider acct_asha (payouts enabled), charge pi_ride. */

@@ -291,32 +291,73 @@ class StripeGatewayTest {
     @Test
     void payoutOnboardingCreatesAnExpressAccountThatCanReceiveTransfersAndALink() {
         UUID riderId = UUID.randomUUID();
-        stub.reply("POST /v1/accounts", 200, "{\"id\":\"acct_1\",\"object\":\"account\"}");
-        stub.reply("POST /v1/account_links", 200,
-                "{\"object\":\"account_link\",\"created\":1,\"expires_at\":1893456000,\"url\":\"https://connect.stripe.com/setup/e/x\"}");
+        stub.reply("POST /v2/core/accounts", 200, "{\"id\":\"acct_1\",\"object\":\"v2.core.account\"}");
+        stub.reply("POST /v2/core/account_links", 200,
+                "{\"object\":\"v2.core.account_link\",\"account\":\"acct_1\",\"created\":\"2026-01-01T00:00:00.000Z\","
+                        + "\"expires_at\":\"2030-01-01T00:00:00.000Z\",\"url\":\"https://connect.stripe.com/setup/e/x\"}");
 
-        var onboarding = gateway.beginPayoutOnboarding(riderId, null);
+        var onboarding = gateway.beginPayoutOnboarding(riderId, null, "asha@example.com");
 
         assertThat(onboarding.providerAccountId()).isEqualTo("acct_1");
         assertThat(onboarding.url()).isEqualTo("https://connect.stripe.com/setup/e/x");
-        assertThat(onboarding.expiresAt().getEpochSecond()).isEqualTo(1893456000L);
-        var account = stub.only("POST /v1/accounts");
-        assertThat(account.form("type")).isEqualTo("express");
-        assertThat(account.form("capabilities[transfers][requested]")).isEqualTo("true");
-        assertThat(account.form("country")).isEqualTo("US");
-        assertThat(account.header("Idempotency-Key")).isEqualTo("acct-" + riderId);
-        var link = stub.only("POST /v1/account_links");
-        assertThat(link.form("account")).isEqualTo("acct_1");
-        assertThat(link.form("type")).isEqualTo("account_onboarding");
-        assertThat(link.form("return_url")).isEqualTo("ridehail://done");
-        assertThat(link.form("refresh_url")).isEqualTo("ridehail://retry");
+        assertThat(onboarding.expiresAt().toString()).isEqualTo("2030-01-01T00:00:00Z");
+        var account = stub.only("POST /v2/core/accounts");
+        var body = account.json();
+        assertThat(body.at("/contact_email").asText()).isEqualTo("asha@example.com");
+        assertThat(body.at("/dashboard").asText()).isEqualTo("express");
+        // separate charges and transfers: the platform collects fees and carries the losses
+        assertThat(body.at("/defaults/responsibilities/fees_collector").asText()).isEqualTo("application");
+        assertThat(body.at("/defaults/responsibilities/losses_collector").asText()).isEqualTo("application");
+        assertThat(body.at("/configuration/recipient/capabilities/stripe_balance/stripe_transfers/requested").asBoolean()).isTrue();
+        assertThat(body.at("/identity/country").asText()).isEqualTo("US");
+        assertThat(body.at("/metadata/ridehail_rider_id").asText()).isEqualTo(riderId.toString());
+        assertThat(account.header("Idempotency-Key")).isEqualTo("acct2-" + riderId);
+        var link = stub.only("POST /v2/core/account_links").json();
+        assertThat(link.at("/account").asText()).isEqualTo("acct_1");
+        assertThat(link.at("/use_case/type").asText()).isEqualTo("account_onboarding");
+        assertThat(link.at("/use_case/account_onboarding/return_url").asText()).isEqualTo("ridehail://done");
+        assertThat(link.at("/use_case/account_onboarding/refresh_url").asText()).isEqualTo("ridehail://retry");
+    }
+
+    @Test
+    void resumingOnboardingReusesTheAccountAndAsksStripeForAFreshLink() {
+        stub.reply("POST /v2/core/account_links", 200,
+                "{\"object\":\"v2.core.account_link\",\"account\":\"acct_9\",\"created\":\"2026-01-01T00:00:00.000Z\","
+                        + "\"expires_at\":\"2030-01-01T00:00:00.000Z\",\"url\":\"https://connect.stripe.com/setup/e/again\"}");
+
+        var onboarding = gateway.beginPayoutOnboarding(UUID.randomUUID(), "acct_9", null);
+
+        assertThat(onboarding.providerAccountId()).isEqualTo("acct_9");
+        assertThat(stub.calls("POST /v2/core/accounts")).isEmpty();
+    }
+
+    @Test
+    void anAccountCanBePaidOnlyWhenStripeSaysTransfersAndPayoutsAreBothActive() throws Exception {
+        stub.reply("GET /v2/core/accounts/acct_ok", 200, v2Account("acct_ok", false, "active", "active"));
+        stub.reply("GET /v2/core/accounts/acct_no_bank", 200, v2Account("acct_no_bank", false, "active", "restricted"));
+        stub.reply("GET /v2/core/accounts/acct_restricted", 200, v2Account("acct_restricted", false, "restricted", "restricted"));
+        stub.reply("GET /v2/core/accounts/acct_closed", 200, v2Account("acct_closed", true, "active", "active"));
+        stub.reply("GET /v2/core/accounts/acct_bare", 200, "{\"id\":\"acct_bare\",\"object\":\"v2.core.account\"}");
+
+        assertThat(gateway.canBePaid("acct_ok")).isTrue();
+        assertThat(gateway.canBePaid("acct_no_bank")).isFalse();
+        assertThat(gateway.canBePaid("acct_restricted")).isFalse();
+        assertThat(gateway.canBePaid("acct_closed")).isFalse();
+        assertThat(gateway.canBePaid("acct_bare")).isFalse();
+    }
+
+    private static String v2Account(String id, boolean closed, String transfers, String payouts) {
+        return "{\"id\":\"" + id + "\",\"object\":\"v2.core.account\",\"closed\":" + closed
+                + ",\"configuration\":{\"recipient\":{\"applied\":true,\"capabilities\":{\"stripe_balance\":{"
+                + "\"stripe_transfers\":{\"status\":\"" + transfers + "\",\"status_details\":[]},"
+                + "\"payouts\":{\"status\":\"" + payouts + "\",\"status_details\":[]}}}}}}";
     }
 
     @Test
     void onboardingFailuresSurfaceAsABadGatewayNotAServerCrash() {
         stub.reply("POST /v1/customers", 500, StubStripe.error("api_error", null, "boom"));
         assertThatThrownBy(() -> gateway.beginCardSetup(UUID.randomUUID(), null)).isInstanceOf(BadGatewayException.class);
-        assertThatThrownBy(() -> gateway.beginPayoutOnboarding(UUID.randomUUID(), null)).isInstanceOf(BadGatewayException.class);
+        assertThatThrownBy(() -> gateway.beginPayoutOnboarding(UUID.randomUUID(), null, "a@example.com")).isInstanceOf(BadGatewayException.class);
     }
 
     // ---------------------------------------------------------------- misc

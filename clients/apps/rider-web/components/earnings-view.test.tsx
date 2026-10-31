@@ -62,7 +62,11 @@ describe("EarningsView", () => {
     vi.stubGlobal("location", { ...window.location, assign });
     const user = userEvent.setup();
     renderApp(<EarningsView />);
-    await user.click(await screen.findByRole("button", { name: "Set up payouts" }));
+    // the provider needs a contact address, so the button waits for one
+    expect(await screen.findByRole("button", { name: "Set up payouts" })).toBeDisabled();
+    await user.type(screen.getByLabelText(/^Email/), "asha@example.com");
+    await user.click(screen.getByRole("button", { name: "Set up payouts" }));
+    expect(api.rider.startPayoutOnboarding).toHaveBeenCalledWith("asha@example.com");
     expect(assign).toHaveBeenCalledWith("https://connect.stripe.com/setup/abc");
     expect(screen.queryByRole("button", { name: /Withdraw/ })).not.toBeInTheDocument();
     vi.unstubAllGlobals();

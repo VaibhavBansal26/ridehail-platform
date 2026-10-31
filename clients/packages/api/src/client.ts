@@ -176,8 +176,11 @@ export function createApi(opts: ApiOptions) {
       payouts: () => get("/api/riders/me/payouts", z.array(Payout)),
       /** Withdraw `amount`, or everything available when omitted. */
       requestPayout: (amount?: number) => post("/api/riders/me/payouts", Payout, amount === undefined ? undefined : { amount }),
-      /** Returns a Stripe-hosted page where the rider gives identity and bank details; we never see them. */
-      startPayoutOnboarding: () => post("/api/riders/me/payout-account/onboarding", PayoutOnboarding),
+      /**
+       * Returns a Stripe-hosted page where the rider gives identity and bank details; we never see them. Stripe needs a
+       * contact `email` to create the account; it is only used the first time (resuming reuses the account).
+       */
+      startPayoutOnboarding: (email: string) => post("/api/riders/me/payout-account/onboarding", PayoutOnboarding, { email }),
     },
   };
 }

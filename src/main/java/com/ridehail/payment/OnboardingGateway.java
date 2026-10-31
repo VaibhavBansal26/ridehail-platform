@@ -26,8 +26,11 @@ public interface OnboardingGateway {
      */
     CardCheckout beginCardCheckout(UUID customerId, String existingProviderCustomerId);
 
-    /** Starts (or resumes) payout onboarding; the rider completes it at {@code url}. */
-    PayoutOnboarding beginPayoutOnboarding(UUID riderId, String existingProviderAccountId);
+    /**
+     * Starts (or resumes) payout onboarding; the rider completes it at {@code url}. {@code email} is the rider's contact
+     * address, which the provider needs when it creates the account (it may be null when {@code existingProviderAccountId} is set).
+     */
+    PayoutOnboarding beginPayoutOnboarding(UUID riderId, String existingProviderAccountId, String email);
 
     record CardSetup(String providerCustomerId, String clientSecret, String publishableKey) {}
 

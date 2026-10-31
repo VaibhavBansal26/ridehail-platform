@@ -59,7 +59,7 @@ export function useRequestPayout() {
 }
 
 export function useStartOnboarding() {
-  return useMutation({ mutationFn: api.rider.startPayoutOnboarding });
+  return useMutation({ mutationFn: (email: string) => api.rider.startPayoutOnboarding(email) });
 }
 
 /** Whether this rider may drive, what is needed and what was sent. Polled slowly: a decision arrives as a notification too. */

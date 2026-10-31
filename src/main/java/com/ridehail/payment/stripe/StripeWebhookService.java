@@ -14,7 +14,6 @@ import com.ridehail.payment.PayoutRepository;
 import com.ridehail.payment.PayoutService;
 import com.ridehail.rider.RiderRepository;
 import com.stripe.exception.SignatureVerificationException;
-import com.stripe.model.Event;
 import com.stripe.net.Webhook;
 import java.time.Clock;
 import java.time.Instant;
@@ -37,7 +36,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  *
  * What each event does:
  *   setup_intent.succeeded     the customer saved a card            -> store the card as their payment method
- *   account.updated            rider onboarding progressed          -> payouts enabled/disabled on their account
+ *   account.updated            (Accounts v1 only)                   -> payouts enabled/disabled on their account
+ *   v2.core.account[...]       rider onboarding progressed (v2)     -> ask Stripe if the account can be paid; enable/disable payouts
  *   payment_intent.succeeded   a charge completed (maybe late)      -> confirm our payment (idempotent)
  *   balance.available          settled funds arrived at the platform -> retry payouts that were waiting for funds
  *   charge.dispute.*           a customer disputed a charge         -> record it; on a chargeback freeze the rider's share (DisputeService)
@@ -62,6 +62,7 @@ public class StripeWebhookService {
     public enum Outcome { HANDLED, DUPLICATE, IGNORED }
 
     private final StripeProperties props;
+    private final StripeGateway gateway;
     private final ProcessedWebhookEventRepository processed;
     private final CustomerRepository customers;
     private final RiderRepository riders;
@@ -76,11 +77,12 @@ public class StripeWebhookService {
     private final ObjectMapper json;
     private final Clock clock;
 
-    StripeWebhookService(StripeProperties props, ProcessedWebhookEventRepository processed, CustomerRepository customers,
+    StripeWebhookService(StripeProperties props, StripeGateway gateway, ProcessedWebhookEventRepository processed, CustomerRepository customers,
                          RiderRepository riders, PaymentService payments, PayoutService payouts,
                          DisputeService disputes, IncidentService incidents, PaymentRepository paymentRepo, PayoutRepository payoutRepo,
                          @Qualifier("taskScheduler") TaskScheduler scheduler, TransactionTemplate tx, ObjectMapper json, Clock clock) {
         this.props = props;
+        this.gateway = gateway;
         this.processed = processed;
         this.customers = customers;
         this.riders = riders;
@@ -102,20 +104,22 @@ public class StripeWebhookService {
         JsonNode object, root;
         try {
             // Stripe signs events for "your account" and for "connected accounts" with different endpoint secrets
-            Event verified = null;
+            boolean verified = false;
             SignatureVerificationException lastFailure = null;
             for (String secret : props.webhookSecrets()) {
                 try {
-                    verified = Webhook.constructEvent(payload, signatureHeader, secret);
-                    break;
+                    verified = Webhook.Signature.verifyHeader(payload, signatureHeader, secret, Webhook.DEFAULT_TOLERANCE);
+                    if (verified) break;
                 } catch (SignatureVerificationException e) {
                     lastFailure = e;
                 }
             }
-            if (verified == null) throw new InvalidWebhookException("Invalid signature", lastFailure);
-            eventId = verified.getId();
-            type = verified.getType();
+            if (!verified) throw new InvalidWebhookException("Invalid signature", lastFailure);
+            // read the payload ourselves rather than as the SDK's v1 Event: v2 ("thin") events have a different shape
             root = json.readTree(payload);
+            eventId = root.path("id").asText(null);
+            type = root.path("type").asText(null);
+            if (eventId == null || type == null) throw new InvalidWebhookException("Malformed webhook", null);
             object = root.path("data").path("object");
         } catch (InvalidWebhookException e) {
             throw e;
@@ -137,6 +141,9 @@ public class StripeWebhookService {
         boolean known = switch (type) {
             case "setup_intent.succeeded" -> { onCardSaved(object); yield true; }
             case "account.updated" -> { onAccountUpdated(object); yield true; }
+            case "v2.core.account[configuration.recipient].capability_status_updated",
+                 "v2.core.account[configuration.recipient].updated",
+                 "v2.core.account[requirements].updated" -> { onRiderAccountChanged(root); yield true; }
             case "payment_intent.succeeded" -> { onPaymentSucceeded(object); yield true; }
             case "balance.available" -> { onFundsAvailable(); yield true; }
             case "payout.failed" -> { onPayoutFailed(root, object); yield true; }
@@ -175,6 +182,24 @@ public class StripeWebhookService {
                 // a rider can only be paid once Stripe says the account can receive funds
                 r -> r.setPayoutAccountToken(payoutsEnabled ? accountId : null),
                 () -> log.warn("account.updated for unknown connected account {}", accountId)));
+    }
+
+    /**
+     * A rider's (Accounts v2) connected account changed. The event only names the account, so ask Stripe where it stands.
+     * The call happens before the transaction opens, and a Stripe outage fails the webhook so that Stripe redelivers it.
+     */
+    private void onRiderAccountChanged(JsonNode event) {
+        String accountId = event.path("related_object").path("id").asText(null);
+        if (accountId == null) return;
+        boolean canBePaid;
+        try {
+            canBePaid = gateway.canBePaid(accountId);
+        } catch (com.stripe.exception.StripeException e) {
+            throw new IllegalStateException("Could not read connected account " + accountId + " from Stripe", e);
+        }
+        tx.executeWithoutResult(s -> riders.findByProviderAccountId(accountId).ifPresentOrElse(
+                r -> r.setPayoutAccountToken(canBePaid ? accountId : null),
+                () -> log.warn("{} for unknown connected account {}", event.path("type").asText(), accountId)));
     }
 
     /** Stripe could not pay out to a bank account: a rider's (connected account) or the platform's own. */

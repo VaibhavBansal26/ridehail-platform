@@ -1,7 +1,7 @@
 import { dateTime, money } from "@ridehail/api";
 import { useState } from "react";
 import { Linking, Text, View } from "react-native";
-import { Badge, Button, Card, ErrorNote, Muted, Stat, StatusBadge, useTheme } from "@/components/ui";
+import { Badge, Button, Card, ErrorNote, Field, Muted, Stat, StatusBadge, useTheme } from "@/components/ui";
 import { useEarnings, usePayouts, useRequestPayout, useStartOnboarding } from "@/lib/queries";
 
 const PAYOUT_NOTE: Record<string, string> = {
@@ -19,6 +19,7 @@ export function EarningsView() {
   const withdraw = useRequestPayout();
   const onboarding = useStartOnboarding();
   const [sent, setSent] = useState<string | null>(null);
+  const [email, setEmail] = useState("");
 
   if (earnings.isPending) return <Muted style={{ textAlign: "center", paddingVertical: 40 }}>Loading…</Muted>;
   if (earnings.isError) return <ErrorNote>{earnings.error.message}</ErrorNote>;
@@ -50,7 +51,9 @@ export function EarningsView() {
           <>
             <Muted>To withdraw, set up where we send your money. You&apos;ll give your details to our payment provider, not to us.</Muted>
             {/* our provider hosts the identity and bank forms; we never see them */}
-            <Button label="Set up payouts" busy={onboarding.isPending} onPress={() => onboarding.mutate(undefined, { onSuccess: (r) => void Linking.openURL(r.url) })} />
+            <Field label="Email" value={email} onChangeText={setEmail} keyboardType="email-address" autoCapitalize="none" autoComplete="email" autoCorrect={false} />
+            <Muted>Our payment provider uses it to contact you about your payout account.</Muted>
+            <Button label="Set up payouts" busy={onboarding.isPending} disabled={!email.includes("@")} onPress={() => onboarding.mutate(email.trim(), { onSuccess: (r) => void Linking.openURL(r.url) })} />
           </>
         )}
       </Card>

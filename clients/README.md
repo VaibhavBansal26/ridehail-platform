@@ -63,7 +63,7 @@ package's tests then say what to update.
   CONNECT frame: the BFF hands the browser a short-lived access token for it, held in memory only. The web app's origin must
   be in the API's `ALLOWED_ORIGINS`.
 - **Cards and payout accounts are never typed into our apps.** The customer app passes the `clientSecret` from
-  `customer.startCardSetup()` to Stripe's SDK; the rider app opens the `url` from `rider.startPayoutOnboarding()`.
+  `customer.startCardSetup()` to Stripe's SDK; the rider app opens the `url` from `rider.startPayoutOnboarding(email)` (Stripe needs a contact email to create the rider's account).
   With the Stripe provider the API refuses client-supplied tokens, so there is no shortcut to build.
 - **Money is shown from the server's numbers** (`fare`, `total`, `available`), never recomputed on the device.
 

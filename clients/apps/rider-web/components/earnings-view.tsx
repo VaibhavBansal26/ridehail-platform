@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Badge, Button, Card, ErrorNote, Stat, StatusBadge } from "@/components/ui";
+import { Badge, Button, Card, ErrorNote, Field, inputClass, Stat, StatusBadge } from "@/components/ui";
 import { dateTime, money, titleCase } from "@/lib/format";
 import { useEarnings, usePayouts, useRequestPayout, useStartOnboarding } from "@/lib/queries";
 
@@ -19,13 +19,14 @@ export function EarningsView() {
   const withdraw = useRequestPayout();
   const onboarding = useStartOnboarding();
   const [sent, setSent] = useState<string | null>(null);
+  const [email, setEmail] = useState("");
 
   if (earnings.isPending) return <p className="py-10 text-center text-sm text-muted">Loading…</p>;
   if (earnings.isError) return <ErrorNote>{earnings.error.message}</ErrorNote>;
   const e = earnings.data;
 
   function startOnboarding() {
-    onboarding.mutate(undefined, {
+    onboarding.mutate(email.trim(), {
       // our provider hosts the identity and bank forms; we never see them
       onSuccess: (r) => window.location.assign(r.url),
     });
@@ -63,7 +64,10 @@ export function EarningsView() {
         ) : (
           <div className="mt-4 space-y-2">
             <p className="text-sm text-muted">To withdraw, set up where we send your money. You&apos;ll give your details to our payment provider, not to us.</p>
-            <Button className="w-full" busy={onboarding.isPending} onClick={startOnboarding}>
+            <Field label="Email" hint="Our payment provider uses it to contact you about your payout account.">
+              <input type="email" autoComplete="email" inputMode="email" value={email} onChange={(ev) => setEmail(ev.target.value)} className={inputClass} />
+            </Field>
+            <Button className="w-full" busy={onboarding.isPending} disabled={!email.includes("@")} onClick={startOnboarding}>
               Set up payouts
             </Button>
           </div>

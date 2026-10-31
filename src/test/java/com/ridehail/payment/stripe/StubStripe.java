@@ -21,9 +21,18 @@ import java.util.concurrent.CopyOnWriteArrayList;
  */
 public final class StubStripe {
 
-    public record Call(String method, String path, Map<String, String> headers, Map<String, String> form) {
+    public record Call(String method, String path, Map<String, String> headers, Map<String, String> form, String body) {
         public String header(String name) { return headers.get(name.toLowerCase()); }
         public String form(String name) { return form.get(name); }
+
+        /** The request body of a v2 call, which Stripe takes as JSON rather than as a form. */
+        public com.fasterxml.jackson.databind.JsonNode json() {
+            try {
+                return new com.fasterxml.jackson.databind.ObjectMapper().readTree(body);
+            } catch (java.io.IOException e) {
+                throw new AssertionError("Request body is not JSON: " + body, e);
+            }
+        }
     }
 
     private record Reply(int status, String body) {}
@@ -78,7 +87,7 @@ public final class StubStripe {
         Map<String, String> headers = new LinkedHashMap<>();
         ex.getRequestHeaders().forEach((k, v) -> headers.put(k.toLowerCase(), v.get(0)));
         String route = ex.getRequestMethod() + " " + ex.getRequestURI().getPath();
-        calls.add(new Call(ex.getRequestMethod(), ex.getRequestURI().getPath(), headers, parseForm(body)));
+        calls.add(new Call(ex.getRequestMethod(), ex.getRequestURI().getPath(), headers, parseForm(body), body));
 
         Deque<Reply> queue = once.get(route);
         Reply reply = queue != null && !queue.isEmpty() ? queue.poll() : sticky.get(route);

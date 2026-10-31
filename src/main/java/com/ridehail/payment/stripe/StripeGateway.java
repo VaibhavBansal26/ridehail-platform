@@ -17,8 +17,6 @@ import com.stripe.exception.StripeException;
 import com.stripe.model.Balance;
 import com.stripe.model.PaymentIntent;
 import com.stripe.net.RequestOptions;
-import com.stripe.param.AccountCreateParams;
-import com.stripe.param.AccountLinkCreateParams;
 import com.stripe.param.CustomerCreateParams;
 import com.stripe.param.PaymentIntentCreateParams;
 import com.stripe.param.RefundCreateParams;
@@ -255,31 +253,73 @@ public class StripeGateway implements PaymentGateway, OnboardingGateway, com.rid
         }
     }
 
+    /**
+     * Riders are Accounts v2 connected accounts with the Express dashboard, our platform collecting fees and carrying
+     * losses (we charge on the platform and transfer to the rider: separate charges and transfers). The v1 `type=express`
+     * call is refused by Stripe for such platforms.
+     */
     @Override
-    public PayoutOnboarding beginPayoutOnboarding(UUID riderId, String existingAccountId) {
+    public PayoutOnboarding beginPayoutOnboarding(UUID riderId, String existingAccountId, String email) {
         try {
             String account = existingAccountId;
             if (account == null) {
-                var create = AccountCreateParams.builder()
-                        .setType(AccountCreateParams.Type.EXPRESS)
-                        .setCapabilities(AccountCreateParams.Capabilities.builder()
-                                .setTransfers(AccountCreateParams.Capabilities.Transfers.builder().setRequested(true).build())
+                var create = com.stripe.param.v2.core.AccountCreateParams.builder()
+                        .setContactEmail(email)
+                        .setDashboard(com.stripe.param.v2.core.AccountCreateParams.Dashboard.EXPRESS)
+                        .setDefaults(com.stripe.param.v2.core.AccountCreateParams.Defaults.builder()
+                                .setResponsibilities(com.stripe.param.v2.core.AccountCreateParams.Defaults.Responsibilities.builder()
+                                        .setFeesCollector(com.stripe.param.v2.core.AccountCreateParams.Defaults.Responsibilities.FeesCollector.APPLICATION)
+                                        .setLossesCollector(com.stripe.param.v2.core.AccountCreateParams.Defaults.Responsibilities.LossesCollector.APPLICATION)
+                                        .build())
+                                .build())
+                        .setConfiguration(com.stripe.param.v2.core.AccountCreateParams.Configuration.builder()
+                                .setRecipient(com.stripe.param.v2.core.AccountCreateParams.Configuration.Recipient.builder()
+                                        .setCapabilities(com.stripe.param.v2.core.AccountCreateParams.Configuration.Recipient.Capabilities.builder()
+                                                .setStripeBalance(com.stripe.param.v2.core.AccountCreateParams.Configuration.Recipient.Capabilities.StripeBalance.builder()
+                                                        .setStripeTransfers(com.stripe.param.v2.core.AccountCreateParams.Configuration.Recipient.Capabilities.StripeBalance.StripeTransfers.builder()
+                                                                .setRequested(true).build())
+                                                        .build())
+                                                .build())
+                                        .build())
                                 .build())
                         .putMetadata("ridehail_rider_id", riderId.toString());
-                if (!blank(props.connectCountry())) create.setCountry(props.connectCountry());
-                account = stripe.accounts().create(create.build(), idempotent("acct-" + riderId)).getId();
+                if (!blank(props.connectCountry())) {
+                    create.setIdentity(com.stripe.param.v2.core.AccountCreateParams.Identity.builder().setCountry(props.connectCountry()).build());
+                }
+                account = stripe.v2().core().accounts().create(create.build(), idempotent("acct2-" + riderId)).getId();
             }
-            var link = stripe.accountLinks().create(AccountLinkCreateParams.builder()
+            var link = stripe.v2().core().accountLinks().create(com.stripe.param.v2.core.AccountLinkCreateParams.builder()
                     .setAccount(account)
-                    .setType(AccountLinkCreateParams.Type.ACCOUNT_ONBOARDING)
-                    .setReturnUrl(props.onboardingReturnUrl())
-                    .setRefreshUrl(props.onboardingRefreshUrl())
+                    .setUseCase(com.stripe.param.v2.core.AccountLinkCreateParams.UseCase.builder()
+                            .setType(com.stripe.param.v2.core.AccountLinkCreateParams.UseCase.Type.ACCOUNT_ONBOARDING)
+                            .setAccountOnboarding(com.stripe.param.v2.core.AccountLinkCreateParams.UseCase.AccountOnboarding.builder()
+                                    .setReturnUrl(props.onboardingReturnUrl())
+                                    .setRefreshUrl(props.onboardingRefreshUrl())
+                                    .build())
+                            .build())
                     .build());
-            return new PayoutOnboarding(account, link.getUrl(), Instant.ofEpochSecond(link.getExpiresAt()));
+            return new PayoutOnboarding(account, link.getUrl(), link.getExpiresAt());
         } catch (StripeException e) {
             log.warn("Stripe payout onboarding failed for rider {}: {}", riderId, e.getMessage());
             throw new BadGatewayException("Could not start payout onboarding, please try again", e);
         }
+    }
+
+    /**
+     * Whether Stripe now lets this connected account receive our transfers and pay out to its bank. v2 accounts send a
+     * thin event ("something about this account changed") instead of the account, so the webhook asks here.
+     *
+     * @throws StripeException if Stripe cannot be reached (the webhook then fails and Stripe redelivers it)
+     */
+    public boolean canBePaid(String accountId) throws StripeException {
+        var account = stripe.v2().core().accounts().retrieve(accountId, com.stripe.param.v2.core.AccountRetrieveParams.builder()
+                .addInclude(com.stripe.param.v2.core.AccountRetrieveParams.Include.CONFIGURATION__RECIPIENT).build());
+        if (Boolean.TRUE.equals(account.getClosed())) return false;
+        var recipient = account.getConfiguration() == null ? null : account.getConfiguration().getRecipient();
+        if (recipient == null || recipient.getCapabilities() == null || recipient.getCapabilities().getStripeBalance() == null) return false;
+        var balance = recipient.getCapabilities().getStripeBalance();
+        return balance.getStripeTransfers() != null && "active".equals(balance.getStripeTransfers().getStatus())
+                && balance.getPayouts() != null && "active".equals(balance.getPayouts().getStatus());
     }
 
     // ---------------------------------------------------------------- error mapping

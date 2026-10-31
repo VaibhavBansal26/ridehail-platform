@@ -95,7 +95,7 @@ public class FakePaymentGateway implements PaymentGateway, OnboardingGateway, co
     }
 
     @Override
-    public PayoutOnboarding beginPayoutOnboarding(UUID riderId, String existing) {
+    public PayoutOnboarding beginPayoutOnboarding(UUID riderId, String existing, String email) {
         return new PayoutOnboarding(existing != null ? existing : "acct_fake_" + riderId,
                 "https://example.test/fake-onboarding", Instant.now().plusSeconds(300));
     }

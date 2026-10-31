@@ -54,6 +54,7 @@ class RiderEarningsController {
     }
 
     record PayoutAccountRequest(@NotBlank @Size(max = 200) String token) {}
+    record OnboardingRequest(@jakarta.validation.constraints.Email @Size(max = 254) String email) {}
     record OnboardingResponse(String url, Instant expiresAt) {}
     record PayoutRequest(@DecimalMin("0.01") @Digits(integer = 10, fraction = 2) BigDecimal amount) {}
     record PayoutView(UUID id, BigDecimal amount, String currency, PayoutStatus status, String failureReason,
@@ -78,10 +79,15 @@ class RiderEarningsController {
      * enables payouts; until then withdrawals are refused.
      */
     @PostMapping("/payout-account/onboarding")
-    OnboardingResponse beginOnboarding(@AuthenticationPrincipal Jwt jwt) {
+    OnboardingResponse beginOnboarding(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody(required = false) OnboardingRequest request) {
         UUID id = CurrentUser.profileId(jwt);
         String existing = tx.execute(s -> findRider(id).getProviderAccountId());
-        var onboard = this.onboarding.beginPayoutOnboarding(id, existing); // provider call outside any DB transaction
+        String email = request == null || request.email() == null || request.email().isBlank() ? null : request.email().trim();
+        // the provider needs a real address to create the account; resuming an existing one does not
+        if (existing == null && email == null && !(onboarding.acceptsClientSuppliedTokens())) {
+            throw new com.ridehail.common.ApiExceptions.BadRequestException("An email address is needed to set up payouts");
+        }
+        var onboard = this.onboarding.beginPayoutOnboarding(id, existing, email); // provider call outside any DB transaction
         tx.executeWithoutResult(s -> findRider(id).setProviderAccountId(onboard.providerAccountId()));
         return new OnboardingResponse(onboard.url(), onboard.expiresAt());
     }
