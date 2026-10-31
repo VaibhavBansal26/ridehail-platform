@@ -23,7 +23,7 @@ import org.springframework.stereotype.Component;
 @Component
 @Profile("!prod")
 @ConditionalOnProperty(name = "ridehail.payments.gateway", havingValue = "fake", matchIfMissing = true)
-public class FakePaymentGateway implements PaymentGateway, OnboardingGateway {
+public class FakePaymentGateway implements PaymentGateway, OnboardingGateway, com.ridehail.dispute.DisputeEvidenceGateway {
 
     private final Map<String, GatewayResult> resultsByKey = new ConcurrentHashMap<>();
     private final List<String> requests = new CopyOnWriteArrayList<>();
@@ -35,6 +35,12 @@ public class FakePaymentGateway implements PaymentGateway, OnboardingGateway {
     public GatewayResult charge(String key, String token, BigDecimal amount, String currency) {
         return handle("charge", key, () -> token == null || token.startsWith("tok_decline")
                 ? GatewayResult.declined("Card declined") : GatewayResult.ok("ch_" + key));
+    }
+
+    @Override
+    public GatewayResult submitEvidence(String key, String providerDisputeId, com.ridehail.dispute.DisputeEvidenceFields evidence) {
+        return handle("evidence", key, () -> providerDisputeId == null || providerDisputeId.startsWith("dp_refuse")
+                ? GatewayResult.declined("Dispute can no longer be answered") : GatewayResult.ok("ev_" + providerDisputeId));
     }
 
     @Override

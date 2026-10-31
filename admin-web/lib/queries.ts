@@ -16,6 +16,7 @@ import {
   TrialBalance,
   TripDetail,
   TripPage,
+  DisputeEvidence,
   VerificationDetail,
   VerificationQueue,
 } from "@/lib/schemas";
@@ -128,3 +129,8 @@ export const useApproveRider = () => useAction((id: string) => post(`verificatio
 export const useRejectRider = () => useAction((v: { id: string; reason: string }) => post(`verifications/${v.id}/reject`, { reason: v.reason }));
 export const useSuspendRider = () => useAction((v: { id: string; reason: string }) => post(`verifications/${v.id}/suspend`, { reason: v.reason }));
 export const useReinstateRider = () => useAction((id: string) => post(`verifications/${id}/reinstate`));
+
+export const useDisputeEvidence = (id: string) =>
+  useQuery({ queryKey: ["dispute-evidence", id], queryFn: () => get(`disputes/${id}/evidence`, DisputeEvidence) });
+export const useSaveEvidence = () => useAction((v: { id: string; explanation: string }) => post(`disputes/${v.id}/evidence`, { explanation: v.explanation }));
+export const useSubmitEvidence = () => useAction((id: string) => post(`disputes/${id}/evidence/submit`));

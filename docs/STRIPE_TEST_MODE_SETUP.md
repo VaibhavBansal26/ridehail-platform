@@ -412,7 +412,7 @@ You're done when A1–A3, B1, C1–C4, D1–D4, E1–E4, F1, G1 all behaved as s
   Until the first charges settle, early payouts show `AWAITING_FUNDS`. That is expected; tell the first riders.
 - [ ] Alert on `GET /api/admin/finance/attention` reporting `needsAction: true` (open chargebacks, open incidents, payments or payouts
   in `REQUIRES_ATTENTION`), and on the `ERROR`-level log lines `Finance incident …` and `Dispute … cannot match`. A chargeback has a
-  response deadline (`evidenceDueBy`): somebody must respond in the Stripe Dashboard before it, or the dispute is lost by default.
+  response deadline (`evidenceDueBy`): somebody must respond (admin panel > Disputes > Answer, or the Stripe Dashboard) before it, or the dispute is lost by default.
 
 ---
 
@@ -436,8 +436,9 @@ You're done when A1–A3, B1, C1–C4, D1–D4, E1–E4, F1, G1 all behaved as s
 - **Stripe forgets idempotency keys after about 24 hours.** The automatic retries (about an hour) are well inside that. An admin
   **Retry** deliberately uses a fresh key, so retry only after checking the first attempt did not charge the customer (the
   payment's reference in the Dashboard).
-- **Disputes are recorded, frozen and settled in the ledger, but not answered.** We do not submit evidence to Stripe; an admin
-  does that in the Stripe Dashboard before the deadline (the admin API gives the link). Reversed transfers and failed refunds are
+- **Disputes are recorded, frozen and settled in the ledger, and can be answered with text evidence from the admin panel.** File
+  evidence is added in the Stripe Dashboard before the deadline (the admin API gives the link). Submitting evidence has not been
+  tried against a real Stripe account yet: make a test dispute (card `4000000000000259`) and answer it from the panel. Reversed transfers and failed refunds are
   raised as incidents for a person; we do not repair the books automatically. See [DISPUTES.md](DISPUTES.md) for the details and
   what is deliberately left manual.
 - **Not covered by any automated test:** the real Stripe network. Everything above exists to cover that.

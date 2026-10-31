@@ -82,20 +82,24 @@ Incidents are idempotent per provider object (a redelivered event cannot raise o
 |---|---|
 | `GET /api/admin/finance/attention` | one glance: open chargebacks (count, amount, overdue, earliest deadline), inquiries, open incidents by type, payments/payouts needing attention, payouts awaiting funds, rider money on hold. `needsAction` is the alert flag. |
 | `GET /api/admin/disputes?status=` / `{id}` | disputes with `evidenceDueBy`, `evidenceOverdue`, rider amount held, fee booked, `matched`/`ledgerNote`, and `providerUrl` (the Stripe Dashboard page to respond on) |
+| `GET /api/admin/disputes/{id}/evidence` | the facts we will send (customer name, service description and date, activity log, compiled from the trip), the saved explanation, whether it can be submitted and if not why, and what was sent once submitted |
+| `POST /api/admin/disputes/{id}/evidence` `{"explanation": "..."}` | save the draft explanation (max 5000 characters). Audited. |
+| `POST /api/admin/disputes/{id}/evidence/submit` | send the facts and explanation to Stripe, once. Refused after the deadline, for a decided dispute, without an explanation, or if already submitted. Audited. |
 | `GET /api/admin/incidents?status=&type=` | incidents |
 | `POST /api/admin/incidents/{id}/resolve` `{"note": "..."}` | record that a person dealt with it. Moves no money. |
 
 ### Runbook: a chargeback arrives
 
 1. `needsAction` turns true; the dispute shows `OPEN` with `evidenceDueBy`.
-2. Open `providerUrl` and respond with evidence in the Stripe Dashboard **before the deadline** (otherwise it is lost by default).
-   The trip, customer and rider ids on the dispute tell you which ride to pull evidence for.
+2. In the admin panel open *Disputes* > **Answer**: check the facts compiled from the trip, write the explanation, save, then
+   **Submit** **before the deadline** (otherwise it is lost by default). Stripe accepts one response, so submitting is final.
+   Receipts, screenshots and other files are not attached from here: for those, use `providerUrl` (the Stripe Dashboard) instead.
 3. Nothing else to do: when Stripe decides, the ledger settles itself and the rider's hold ends.
 4. If you decide not to contest, there is no need to do anything either: it will end `LOST` and be booked per the loss policy.
 
 ## Not covered (deliberately)
 
-- **Submitting evidence** to the provider from this system.
+- **Attaching files** (receipts, screenshots, messages) as evidence. Text evidence is submitted from the panel; files go through the Stripe Dashboard. The text path has been exercised against the simulated gateway only, not a live Stripe account.
 - **Repairing the books after a reversed transfer or failed refund**: needs a business decision, so it is surfaced instead.
 - **Fee refunds that arrive without a dispute event** are only picked up the next time a dispute event arrives for that dispute.
 - **Multiple disputes on one payment** (the provider allows one per charge) and disputes in a currency other than the platform's.

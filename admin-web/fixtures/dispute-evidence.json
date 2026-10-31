@@ -1,0 +1,16 @@
+{
+  "disputeId" : "eb6eff76-1480-4871-a223-75e62a1abc0f",
+  "explanation" : "The customer rode with us.",
+  "facts" : {
+    "customerName" : "Ravi",
+    "productDescription" : "Ride-hailing trip (SEDAN) from 12.97160,77.59460 to 12.93520,77.62450.",
+    "serviceDate" : "2026-10-31",
+    "accessActivityLog" : "Trip 3d92b02f-6105-413c-a535-fd524646542c (SEDAN).\nRequested by the customer in the app at 2026-10-31T13:29:26.662680Z.\nAccepted by a driver at 2026-10-31T13:29:26.662680Z.\nTrip started at 2026-10-31T13:29:26.662680Z.\nTrip completed at 2026-10-31T13:29:26.662680Z.\nFare 9.99 USD (surge x1.0), charged to the card the customer saved in their account."
+  },
+  "submitted" : false,
+  "submittedAt" : null,
+  "lastError" : null,
+  "canSubmit" : true,
+  "cannotSubmitBecause" : null,
+  "evidenceDueBy" : "2026-11-07T13:29:26.662680Z"
+}

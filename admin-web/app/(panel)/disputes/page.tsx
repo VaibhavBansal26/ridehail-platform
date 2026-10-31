@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { ExternalLink } from "lucide-react";
 import { Badge, DataTable, Empty, ErrorBox, IdLink, Loading, PageHeader, Pager, Select, StatusBadge, Td, useNow } from "@/components/ui";
@@ -16,7 +17,7 @@ export default function DisputesPage() {
   return (
     <>
       <PageHeader
-        title="Disputes" subtitle="Chargebacks and inquiries. Evidence is submitted in the payment provider's dashboard; this page tells you which ones are urgent."
+        title="Disputes" subtitle="Chargebacks and inquiries. Answer an open one here, with the facts from our records. This page also tells you which are urgent."
         actions={<Select label="Status" value={status} onChange={(v) => { setStatus(v); setPage(0); }} options={[{ value: "", label: "All" }, ...DisputeStatus.options.map((s) => ({ value: s, label: titleCase(s) }))]} />}
       />
       {disputes.isPending ? <Loading /> : disputes.isError ? <ErrorBox error={disputes.error} onRetry={() => disputes.refetch()} /> : disputes.data.items.length === 0 ? <Empty>No disputes{status ? ` that are ${titleCase(status)}` : ""}.</Empty> : (
@@ -31,7 +32,8 @@ export default function DisputesPage() {
                   <Td>
                     <div className="font-mono text-xs">{d.providerId}</div>
                     <div className="text-xs text-muted">{dateTime(d.createdAt)}</div>
-                    {url && unanswered ? <a href={url} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1 text-sm text-accent hover:underline">Respond <ExternalLink className="size-3.5" aria-hidden /><span className="sr-only">(opens the payment dashboard)</span></a> : null}
+                    {unanswered && d.matched ? <Link href={`/disputes/${d.id}`} className="mt-1 mr-3 inline-block text-sm text-accent hover:underline">Answer</Link> : null}
+                    {url && unanswered ? <a href={url} target="_blank" rel="noopener noreferrer" className="mt-1 inline-flex items-center gap-1 text-sm text-accent hover:underline">Provider dashboard <ExternalLink className="size-3.5" aria-hidden /><span className="sr-only">(opens the payment dashboard)</span></a> : null}
                   </Td>
                   <Td><StatusBadge status={d.status} /></Td>
                   <Td className="tabular-nums">{money(d.amount, d.currency)}</Td>

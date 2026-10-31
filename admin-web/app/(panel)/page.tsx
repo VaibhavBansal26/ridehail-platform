@@ -54,7 +54,7 @@ export default function OverviewPage() {
         />
         <Stat
           label="Past evidence deadline" value={a.disputes.overdue} href="/disputes" tone={a.disputes.overdue > 0 ? "bad" : "ok"}
-          hint={a.disputes.overdue > 0 ? "Respond in the payment dashboard now" : "No missed deadlines"}
+          hint={a.disputes.overdue > 0 ? "Answer these in Disputes now" : "No missed deadlines"}
         />
         <Stat
           label="Open incidents" value={a.incidents.open} href="/incidents" tone={a.incidents.open > 0 ? "bad" : "ok"}

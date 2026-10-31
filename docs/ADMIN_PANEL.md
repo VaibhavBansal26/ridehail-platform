@@ -11,7 +11,7 @@ finance incidents, and one "needs attention" summary that tells you whether anyt
 | Trips / trip detail | Filter by status. Detail shows names, fare, the timeline, the payment, every dispatch offer sent to riders and what each answered, and disputes. **Cancel trip** (with confirmation). |
 | Riders | Status, rating, last position and whether they are still reporting. |
 | Payments / payouts | Charges with **Retry** (stuck) and **Refund** (captured), both behind a confirmation; payouts with how long each has been waiting for funds. |
-| Disputes | Status, amount, reason, evidence deadline (overdue ones in red), what the ledger did, and a **Respond** link into the payment provider's dashboard (only `https://*.stripe.com` links are ever offered). Evidence itself is submitted there, not here. |
+| Disputes | Status, amount, reason, evidence deadline (overdue ones in red), what the ledger did, an **Answer** page (facts from the trip, your explanation, submit once) and a link into the payment provider's dashboard (only `https://*.stripe.com` links are ever offered). Evidence itself is submitted there, not here. |
 | Incidents | Failed bank payouts, reversed transfers, failed refunds. **Resolve** records what was done (it moves no money). |
 | Ledger | The trial balance by account type and whether debits equal credits. |
 | Audit log | Who did what: every change an admin makes, with the person, the time and the target. The table is append-only (a Postgres trigger refuses updates and deletes, like the ledger). |
@@ -117,8 +117,8 @@ cookie's path each fails a test.
   admin token are recorded the same way (the log is in the API, not the panel).
 - **Polling, not push.** Admins deliberately cannot subscribe to the WebSocket streams (they carry rider and customer data
   addressed to those users), so the map is a 5-second snapshot. A `/user/topic/ops` stream for admins would make it live.
-- **Disputes are answered in the provider's dashboard.** The panel shows deadlines and links there; uploading evidence from
-  the panel is not built.
+- **Dispute evidence is text only.** The panel submits the trip facts and your explanation to the provider; files (receipts,
+  screenshots) still go through the provider's dashboard.
 - **The map shows riders as of their last reported position**, so a rider whose app is closed stays where they were until the
   "not reporting" threshold (2 minutes) marks them.
 - **`package.json` pins `@emnapi/core`, `@emnapi/runtime` and `@emnapi/wasi-threads`.** npm leaves the WebAssembly fallbacks of

@@ -51,7 +51,7 @@ import org.springframework.stereotype.Component;
  */
 @Component
 @ConditionalOnProperty(name = "ridehail.payments.gateway", havingValue = "stripe")
-public class StripeGateway implements PaymentGateway, OnboardingGateway {
+public class StripeGateway implements PaymentGateway, OnboardingGateway, com.ridehail.dispute.DisputeEvidenceGateway {
     private static final Logger log = LoggerFactory.getLogger(StripeGateway.class);
 
     /** Card error codes that Stripe documents as "try again", as opposed to a real decline. */
@@ -106,6 +106,26 @@ public class StripeGateway implements PaymentGateway, OnboardingGateway {
             return fromIntent(stripe.paymentIntents().create(params, idempotent("charge-" + key)));
         } catch (StripeException e) {
             return map(e);
+        }
+    }
+
+    /** Answers the dispute and submits in one call: the provider accepts a single response, so there is no separate draft at Stripe. */
+    @Override
+    public GatewayResult submitEvidence(String key, String providerDisputeId, com.ridehail.dispute.DisputeEvidenceFields e) {
+        try {
+            var evidence = com.stripe.param.DisputeUpdateParams.Evidence.builder()
+                    .setCustomerName(e.customerName())
+                    .setProductDescription(e.productDescription())
+                    .setServiceDate(e.serviceDate())
+                    .setAccessActivityLog(e.accessActivityLog())
+                    .setUncategorizedText(e.explanation())
+                    .build();
+            stripe.disputes().update(providerDisputeId,
+                    com.stripe.param.DisputeUpdateParams.builder().setEvidence(evidence).setSubmit(true).build(),
+                    idempotent("evidence-" + key));
+            return GatewayResult.ok(providerDisputeId);
+        } catch (StripeException ex) {
+            return map(ex);
         }
     }
 

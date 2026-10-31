@@ -306,3 +306,24 @@ export const VerificationDetail = z.object({
   }),
 });
 export type VerificationDetail = z.infer<typeof VerificationDetail>;
+
+// ---------------------------------------------------------------- dispute evidence
+
+export const DisputeEvidence = z.object({
+  disputeId: z.string(),
+  explanation: z.string().nullish(),
+  facts: z.object({
+    customerName: z.string().nullish(),
+    productDescription: z.string().nullish(),
+    serviceDate: z.string().nullish(),
+    accessActivityLog: z.string().nullish(),
+  }),
+  submitted: z.boolean(),
+  submittedAt: z.string().nullish(),
+  lastError: z.string().nullish(),
+  canSubmit: z.boolean(),
+  cannotSubmitBecause: z.string().nullish(),
+  evidenceDueBy: z.string().nullish(),
+});
+export type DisputeEvidence = z.infer<typeof DisputeEvidence>;
+export const EVIDENCE_LIMIT = 5000;
