@@ -87,6 +87,9 @@ jobs:
       - name: Rider web app, lint and production build
         run: npm run lint --workspace ridehail-rider-web && npm run build --workspace ridehail-rider-web
         working-directory: clients
+      - name: Rider phone app, bundled for iOS and Android
+        run: CI=1 npx expo export --platform ios --platform android --output-dir /tmp/rider-dist
+        working-directory: clients/apps/rider-mobile
       - name: A ride through the shared client against the running API
         run: |
           mvn -B -q -DskipTests spring-boot:run > api.log 2>&1 &

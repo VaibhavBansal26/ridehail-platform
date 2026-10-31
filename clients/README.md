@@ -6,13 +6,14 @@ Four apps on one shared client, in an npm workspace:
 |---|---|---|
 | `packages/api` | `@ridehail/api`: typed REST client, token refresh, STOMP realtime, zod schemas | **built, tested** |
 | `apps/rider-web` | Next.js rider app | **built, tested** ([below](#rider-web)) |
-| `apps/rider-mobile`, `apps/customer-mobile` | Expo / React Native | not started |
+| `apps/rider-mobile` | Expo / React Native rider app | **built, tested; not run on a device** ([below](#rider-mobile)) |
 | `apps/customer-web` | Next.js customer app | not started |
+| `apps/customer-mobile` | Expo / React Native customer app | not started |
 
 ```bash
 cd clients
 npm install
-npm run typecheck && npm test                                   # 36 package tests + 99 rider-web tests; the live ride below is skipped
+npm run typecheck && npm test                                   # package, rider-web and rider-mobile tests; the live ride below is skipped
 RIDEHAIL_E2E_URL=http://localhost:8080 npm test --workspace @ridehail/api   # with the API running: a whole ride
 ```
 
@@ -87,3 +88,29 @@ npm run dev --workspace ridehail-rider-web                 # http://localhost:30
   makes the app read the truth over REST. Everything also polls slowly in case a push is lost.
 - Backend additions this needed: `GET /api/trips/active` (find the current trip again after a reload), pickup/drop coordinates
   on trips, and the fare and coordinates on `GET /api/riders/me/offers`.
+
+## rider-mobile
+
+`apps/rider-mobile` (Expo SDK 58, expo-router): the same flows as rider-web as a phone app (sign in or create an account, go
+online, live offers, accept, run the trip, earnings and payouts), plus what only a phone can do: **keep reporting the rider's
+position with the screen off**.
+
+```bash
+cd apps/rider-mobile
+EXPO_PUBLIC_API_URL=http://<your computer's address>:8080 npx expo start    # a real phone needs the computer's address, not localhost
+npx expo start --web                                                        # the screens in a browser (no background location, no keychain)
+npm test                                                                    # Jest: the background handler, token storage, session, screens
+```
+
+- **Tokens live in the OS keychain/keystore** (`expo-secure-store`) via `TokenStore`; the shared client refreshes them, and
+  `auth.accessToken()` renews one that is about to expire before every WebSocket reconnect.
+- **Position:** while the app is open it reports every 4 s like the web app. With "Always" location allowed, an OS background
+  task (`src/lib/background.ts`) keeps going with the screen off; on Android a foreground-service notification keeps it alive.
+  The task sends only the latest position, at the server's pace, and stays quiet while the app is open (the foreground
+  reporter is already sending). Without "Always" the app says so and the rider is only visible while it is open.
+- **Needs a development build for background location.** Expo Go cannot run it. `npx expo run:ios` / `run:android`
+  (or an EAS development build) produce one; both need Xcode or the Android SDK.
+- **What has and has not been verified.** Verified: types, 29 Jest tests, a Metro bundle for iOS and Android (in CI), and the
+  screens driven in a browser through Expo's web build against the real API over HTTP and WebSocket (sign-in, live offer, accept,
+  trip panel). **Not verified: running on an iOS simulator, Android emulator or a real phone**, so the keychain, the OS
+  permission prompts and background location itself are untested. Do that before relying on them.

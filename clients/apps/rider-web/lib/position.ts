@@ -1,13 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 
-export type Fix = { lat: number; lon: number; heading?: number };
-export type PositionProblem = { denied: boolean; message: string };
+import { type Fix, type PositionProblem, type PositionSource, startLocationReporting, type TrackingState } from "@ridehail/api";
 
-/** Where positions come from. The browser's geolocation in the app; a fake in tests. */
-export interface PositionSource {
-  watch(onFix: (fix: Fix) => void, onProblem: (p: PositionProblem) => void): () => void;
-  current(): Promise<Fix>;
-}
+export type { Fix, PositionProblem, PositionSource, TrackingState };
 
 function toFix(p: GeolocationPosition): Fix {
   const { latitude, longitude, heading } = p.coords;
@@ -37,33 +32,7 @@ export const browserPosition: PositionSource = {
   },
 };
 
-/**
- * Decides which positions to send. The server accepts about one a second and drops the rest, so we send one every few
- * seconds, always the latest, and after a 429 stay quiet for as long as the server asked.
- */
-export class LocationThrottle {
-  private lastSent = -Infinity;
-  private quietUntil = -Infinity;
-  constructor(private readonly intervalMs = 4000) {}
-
-  /** The position to send now, or null to hold it back. */
-  take(fix: Fix, now: number): Fix | null {
-    if (now < this.quietUntil || now - this.lastSent < this.intervalMs) return null;
-    this.lastSent = now;
-    return fix;
-  }
-
-  backOff(seconds: number, now: number) {
-    this.quietUntil = now + seconds * 1000;
-  }
-}
-
-export type TrackingState = "idle" | "tracking" | "denied" | "unavailable";
-
-/**
- * While `enabled`, watches the position and sends it every few seconds. Positions that fail to send are dropped, not
- * queued: a stale position is worse than none, and the next one follows within seconds.
- */
+/** While `enabled`, watches the position and sends it every few seconds (see startLocationReporting). */
 export function useLocationReporter(opts: {
   enabled: boolean;
   source: PositionSource;
@@ -71,8 +40,7 @@ export function useLocationReporter(opts: {
   intervalMs?: number;
 }): { state: TrackingState; message: string | null; last: Fix | null } {
   const { enabled, source, intervalMs } = opts;
-  const [state, setState] = useState<TrackingState>("idle");
-  const [message, setMessage] = useState<string | null>(null);
+  const [status, setStatus] = useState<{ state: TrackingState; message: string | null }>({ state: "idle", message: null });
   const [last, setLast] = useState<Fix | null>(null);
   const send = useRef(opts.send);
   useEffect(() => {
@@ -81,32 +49,16 @@ export function useLocationReporter(opts: {
 
   useEffect(() => {
     if (!enabled) return;
-    const throttle = new LocationThrottle(intervalMs);
-    const stop = source.watch(
-      (fix) => {
-        setState("tracking");
-        setMessage(null);
-        setLast(fix);
-        const now = Date.now();
-        const toSend = throttle.take(fix, now);
-        if (toSend) {
-          send.current(toSend).catch((e: { isRateLimited?: boolean; retryAfterSeconds?: number }) => {
-            if (e?.isRateLimited) throttle.backOff(e.retryAfterSeconds ?? 5, Date.now());
-          });
-        }
-      },
-      (p) => {
-        setState(p.denied ? "denied" : "unavailable");
-        setMessage(p.message);
-      },
-    );
-    return () => {
-      stop();
-      setState("idle");
-    };
+    return startLocationReporting({
+      source,
+      intervalMs,
+      send: (fix) => send.current(fix),
+      onFix: setLast,
+      onState: (state, message) => setStatus({ state, message }),
+    });
   }, [enabled, source, intervalMs]);
 
-  return { state, message, last };
+  return { ...status, last };
 }
 
 /** A position the rider typed in: for a desktop, a phone whose GPS is off, or trying the app without driving anywhere. */

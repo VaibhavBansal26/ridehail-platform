@@ -23,12 +23,33 @@ export interface AuthStrategy {
   refresh(): Promise<boolean>;
 }
 
+export interface BearerAuth extends AuthStrategy {
+  /**
+   * A bearer token that is good for at least a minute, renewing it first if it is about to expire; null if signed out.
+   * For connections that cannot retry on a 401 the way a request can (the WebSocket).
+   */
+  accessToken(): Promise<string | null>;
+}
+
 export interface BearerAuthOptions {
   store: TokenStore;
   baseUrl: string;
   fetch?: typeof fetch;
   /** Called when the refresh token is rejected: the person has to sign in again. Tokens are already cleared. */
   onSignedOut?: () => void;
+}
+
+/** The `exp` (seconds since 1970) of a JWT, without verifying it: the server verifies; this only decides when to renew. */
+export function jwtExpiry(jwt: string): number | null {
+  try {
+    const part = jwt.split(".")[1];
+    if (!part) return null;
+    const b64 = part.replace(/-/g, "+").replace(/_/g, "/");
+    const payload = JSON.parse(atob(b64 + "=".repeat((4 - (b64.length % 4)) % 4))) as { exp?: unknown };
+    return typeof payload.exp === "number" ? payload.exp : null;
+  } catch {
+    return null;
+  }
 }
 
 /** In-memory token store, for tests and for the web client's WebSocket token. */
@@ -47,7 +68,7 @@ export function memoryTokenStore(initial: Tokens | null = null): TokenStore {
  * single refresh call (the server rotates refresh tokens, so two parallel refreshes would invalidate each other).
  * A refresh the server refuses signs the person out; a refresh that merely could not reach the server does not.
  */
-export function bearerAuth(opts: BearerAuthOptions): AuthStrategy {
+export function bearerAuth(opts: BearerAuthOptions): BearerAuth {
   const doFetch = opts.fetch ?? fetch;
   let inFlight: Promise<boolean> | null = null;
 
@@ -77,6 +98,17 @@ export function bearerAuth(opts: BearerAuthOptions): AuthStrategy {
   }
 
   return {
+    async accessToken() {
+      const tokens = await opts.store.load();
+      if (!tokens) return null;
+      const exp = jwtExpiry(tokens.accessToken);
+      // an unreadable token is sent as it is: the server decides
+      if (exp !== null && exp - Date.now() / 1000 < 60) {
+        if (!(await this.refresh())) return null;
+        return (await opts.store.load())?.accessToken ?? null;
+      }
+      return tokens.accessToken;
+    },
     async headers(): Promise<Record<string, string>> {
       const tokens = await opts.store.load();
       return tokens ? { Authorization: `Bearer ${tokens.accessToken}` } : {};

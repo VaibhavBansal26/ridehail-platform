@@ -165,6 +165,44 @@ describe("token refresh", () => {
   });
 });
 
+const b64 = (o: unknown) => btoa(JSON.stringify(o)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+const jwtLeft = (seconds: number) => `${b64({ alg: "HS256" })}.${b64({ exp: Math.floor(Date.now() / 1000) + seconds })}.sig`;
+
+describe("accessToken (for the WebSocket)", () => {
+  function auth(accessToken: string, handler: Handler = () => json(authResult)) {
+    const calls: string[] = [];
+    const fetcher = (async (url: string, init: RequestInit) => (calls.push(url), handler(url, init))) as unknown as typeof fetch;
+    const store = memoryTokenStore({ accessToken, refreshToken: "R1" });
+    return { auth: bearerAuth({ store, baseUrl: BASE, fetch: fetcher }), calls, store };
+  }
+
+  it("returns a token with plenty of life left as it is", async () => {
+    const t = jwtLeft(600);
+    const { auth: a, calls } = auth(t);
+    expect(await a.accessToken()).toBe(t);
+    expect(calls).toEqual([]);
+  });
+
+  it("renews one that is about to expire, and saves the new pair", async () => {
+    const { auth: a, calls, store } = auth(jwtLeft(10));
+    expect(await a.accessToken()).toBe("A2");
+    expect(calls).toEqual([`${BASE}/api/auth/refresh`]);
+    expect(await store.load()).toEqual({ accessToken: "A2", refreshToken: "R2" });
+  });
+
+  it("is null when signed out, or when the session cannot be renewed", async () => {
+    expect(await bearerAuth({ store: memoryTokenStore(), baseUrl: BASE }).accessToken()).toBeNull();
+    const { auth: a } = auth(jwtLeft(-5), () => json({}, 401));
+    expect(await a.accessToken()).toBeNull();
+  });
+
+  it("sends a token it cannot read as it is, and lets the server decide", async () => {
+    const { auth: a, calls } = auth("not-a-jwt");
+    expect(await a.accessToken()).toBe("not-a-jwt");
+    expect(calls).toEqual([]);
+  });
+});
+
 describe("web (cookie) auth", () => {
   it("adds no Authorization header and, on 401, reports the sign-out instead of refreshing", async () => {
     const onSignedOut = vi.fn();

@@ -1,25 +1,6 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { type Fix, LocationThrottle, loadManualPosition, type PositionSource, saveManualPosition, useLocationReporter } from "@/lib/position";
-
-describe("LocationThrottle", () => {
-  it("sends the first position, then at most one per interval, always the latest", () => {
-    const t = new LocationThrottle(4000);
-    expect(t.take({ lat: 1, lon: 1 }, 0)).toEqual({ lat: 1, lon: 1 });
-    expect(t.take({ lat: 2, lon: 2 }, 1000)).toBeNull();
-    expect(t.take({ lat: 3, lon: 3 }, 3999)).toBeNull();
-    expect(t.take({ lat: 4, lon: 4 }, 4000)).toEqual({ lat: 4, lon: 4 });
-  });
-
-  it("stays quiet for as long as the server asked after a 429", () => {
-    const t = new LocationThrottle(1000);
-    t.take({ lat: 1, lon: 1 }, 0);
-    t.backOff(10, 500);
-    expect(t.take({ lat: 2, lon: 2 }, 5000)).toBeNull();
-    expect(t.take({ lat: 3, lon: 3 }, 10_499)).toBeNull();
-    expect(t.take({ lat: 4, lon: 4 }, 10_500)).toEqual({ lat: 4, lon: 4 });
-  });
-});
+import { type Fix, loadManualPosition, type PositionSource, saveManualPosition, useLocationReporter } from "@/lib/position";
 
 describe("useLocationReporter", () => {
   beforeEach(() => vi.useFakeTimers({ now: 1_000_000 }));
