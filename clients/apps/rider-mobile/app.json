@@ -52,6 +52,14 @@
         {
           "defaultChannel": "default"
         }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Ridehail uses your photos so you can send your documents for verification.",
+          "cameraPermission": "Ridehail uses your camera so you can photograph your documents and take a selfie for verification.",
+          "microphonePermission": false
+        }
       ]
     ],
     "experiments": {

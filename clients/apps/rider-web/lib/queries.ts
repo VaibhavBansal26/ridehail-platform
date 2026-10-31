@@ -1,6 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { DocumentType } from "@ridehail/api";
 import { api } from "@/lib/api";
 
 export const keys = {
@@ -9,6 +10,7 @@ export const keys = {
   offers: ["offers"] as const,
   earnings: ["earnings"] as const,
   payouts: ["payouts"] as const,
+  verification: ["verification"] as const,
 };
 
 // Pushes make these instant, but they are best-effort, so everything also polls slowly: REST is the source of truth.
@@ -58,4 +60,20 @@ export function useRequestPayout() {
 
 export function useStartOnboarding() {
   return useMutation({ mutationFn: api.rider.startPayoutOnboarding });
+}
+
+/** Whether this rider may drive, what is needed and what was sent. Polled slowly: a decision arrives as a notification too. */
+export const useVerification = () => useQuery({ queryKey: keys.verification, queryFn: api.rider.verification, refetchInterval: 30_000 });
+
+export function useUploadDocument() {
+  const refresh = useRefreshAll();
+  return useMutation({
+    mutationFn: (v: { type: DocumentType; file: File; expiresOn?: string }) => api.rider.uploadDocument(v.type, v.file, v.expiresOn),
+    onSettled: refresh,
+  });
+}
+
+export function useSubmitVerification() {
+  const refresh = useRefreshAll();
+  return useMutation({ mutationFn: api.rider.submitVerification, onSettled: refresh });
 }

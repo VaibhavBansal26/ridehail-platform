@@ -259,3 +259,50 @@ export const AdminAction = z.object({
 });
 export type AdminAction = z.infer<typeof AdminAction>;
 export const AuditPage = page(AdminAction);
+
+// ---------------------------------------------------------------- rider verification
+
+export const VerificationStatus = z.enum(["NOT_SUBMITTED", "PENDING_REVIEW", "APPROVED", "REJECTED", "SUSPENDED", "EXPIRED"]);
+export const DocumentType = z.enum(["DRIVING_LICENCE", "VEHICLE_REGISTRATION", "INSURANCE", "SELFIE"]);
+export type DocumentType = z.infer<typeof DocumentType>;
+
+export const VerificationQueueItem = z.object({
+  riderId: z.string(),
+  name: z.string(),
+  phone: z.string(),
+  vehicleType: z.string(),
+  status: VerificationStatus,
+  submittedAt: z.string().nullish(),
+  documents: z.number(),
+});
+export type VerificationQueueItem = z.infer<typeof VerificationQueueItem>;
+export const VerificationQueue = page(VerificationQueueItem);
+
+export const VerificationDocument = z.object({
+  type: DocumentType,
+  label: z.string(),
+  contentType: z.string(),
+  sizeBytes: z.number(),
+  uploadedAt: z.string(),
+  expiresOn: z.string().nullish(),
+});
+
+export const VerificationDetail = z.object({
+  riderId: z.string(),
+  name: z.string(),
+  phone: z.string(),
+  vehicleType: z.string(),
+  verification: z.object({
+    required: z.boolean(),
+    status: VerificationStatus,
+    note: z.string().nullish(),
+    submittedAt: z.string().nullish(),
+    reviewedAt: z.string().nullish(),
+    requirements: z.array(z.object({ type: DocumentType, label: z.string(), needsExpiry: z.boolean(), imageOnly: z.boolean() })),
+    documents: z.array(VerificationDocument),
+    missing: z.array(DocumentType),
+    canUpload: z.boolean(),
+    canSubmit: z.boolean(),
+  }),
+});
+export type VerificationDetail = z.infer<typeof VerificationDetail>;

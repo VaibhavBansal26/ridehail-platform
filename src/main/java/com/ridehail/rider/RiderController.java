@@ -53,6 +53,10 @@ class RiderController {
     @Transactional
     RiderResponse online(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody LocationRequest l) {
         var rider = find(jwt);
+        if (!rider.isVerified()) {
+            throw new com.ridehail.common.ApiExceptions.ForbiddenException(
+                    "Your account is not verified yet. Open Verification to send your documents or see where they stand.");
+        }
         rider.goOnline(l.lat(), l.lon(), Instant.now(clock));
         return RiderResponse.of(rider);
     }

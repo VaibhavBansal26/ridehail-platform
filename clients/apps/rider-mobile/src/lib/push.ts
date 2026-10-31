@@ -70,6 +70,10 @@ export async function unregisterPush(): Promise<void> {
 }
 
 /** Where tapping a notification should go. */
-export function routeForNotification(data: Record<string, unknown> | undefined): "/" | "/earnings" {
-  return data?.type === "BANK_PAYOUT_FAILED" ? "/earnings" : "/";
+export function routeForNotification(data: Record<string, unknown> | undefined): "/" | "/earnings" | "/verification" {
+  const type = typeof data?.type === "string" ? data.type : "";
+  if (type === "BANK_PAYOUT_FAILED") return "/earnings";
+  // approved, sent back, suspended, expiring, expired: all are answered on the Verification screen
+  if (type.startsWith("VERIFICATION_")) return "/verification";
+  return "/";
 }

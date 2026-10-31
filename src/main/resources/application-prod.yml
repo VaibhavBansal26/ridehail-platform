@@ -26,6 +26,9 @@ ridehail:
       client-passcode: ${RABBITMQ_PASSWORD:}
   ratelimit:
     store: ${RATELIMIT_STORE:redis}        # redis = limits shared by every instance (REDIS_HOST, REDIS_PASSWORD)
+  verification:
+    required: ${RIDER_VERIFICATION_REQUIRED:true}
+    encryption-key: ${DOCUMENT_ENCRYPTION_KEY}   # no default: the app refuses to start without it (losing it loses every document)
   notifications:
     provider: ${PUSH_PROVIDER:expo}
   payments:

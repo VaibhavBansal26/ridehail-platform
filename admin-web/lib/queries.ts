@@ -16,6 +16,8 @@ import {
   TrialBalance,
   TripDetail,
   TripPage,
+  VerificationDetail,
+  VerificationQueue,
 } from "@/lib/schemas";
 
 const PAGE_SIZE = 20;
@@ -110,3 +112,19 @@ export const useResolveIncident = () =>
   useAction((v: { id: string; note: string }) => post(`incidents/${v.id}/resolve`, { note: v.note }));
 export const useCreateAdmin = () => useAction((v: { phone: string; password: string }) => post("admins", v));
 export const useSetAdminEnabled = () => useAction((v: { id: string; enabled: boolean }) => post(`admins/${v.id}/${v.enabled ? "enable" : "disable"}`));
+
+export const useVerificationQueue = (status: string, page: number) =>
+  useQuery({
+    queryKey: ["verifications", status, page],
+    queryFn: () => get("verifications" + query({ status, page, size: PAGE_SIZE }), VerificationQueue),
+    placeholderData: keepPreviousData,
+    refetchInterval: 30_000,
+  });
+
+export const useVerification = (riderId: string) =>
+  useQuery({ queryKey: ["verification", riderId], queryFn: () => get(`verifications/${riderId}`, VerificationDetail), refetchInterval: 30_000 });
+
+export const useApproveRider = () => useAction((id: string) => post(`verifications/${id}/approve`));
+export const useRejectRider = () => useAction((v: { id: string; reason: string }) => post(`verifications/${v.id}/reject`, { reason: v.reason }));
+export const useSuspendRider = () => useAction((v: { id: string; reason: string }) => post(`verifications/${v.id}/suspend`, { reason: v.reason }));
+export const useReinstateRider = () => useAction((id: string) => post(`verifications/${id}/reinstate`));

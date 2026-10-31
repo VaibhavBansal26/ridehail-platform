@@ -1,8 +1,8 @@
 {
-  "id" : "964b3b90-0c1f-4312-b9a5-45e4a15a105a",
+  "id" : "747c66bf-8a7b-4d9c-b05a-b85873203956",
   "status" : "ACCEPTED",
-  "customerId" : "2c73fee7-cdc2-445a-ab54-4fd17d52dfcc",
-  "riderId" : "d64720b1-e22c-40e5-aa88-b2bbdf2f95f4",
+  "customerId" : "0a2f13d8-de5b-4d48-bb24-f772a5022a16",
+  "riderId" : "254672f9-2783-44f4-8ca6-0ad47c5f411f",
   "vehicleType" : "SEDAN",
   "fare" : 9.99,
   "surgeMultiplier" : 1.0,

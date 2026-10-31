@@ -9,13 +9,17 @@ import { Button, Card, ErrorNote } from "@/components/ui";
 import { api } from "@/lib/api";
 import { money } from "@/lib/format";
 import { browserPosition, type Fix, loadManualPosition, manualPosition, saveManualPosition, useLocationReporter } from "@/lib/position";
-import { useActiveTrip, useGoOffline, useGoOnline, useOffers, useRider } from "@/lib/queries";
+import Link from "next/link";
+import { useActiveTrip, useGoOffline, useGoOnline, useOffers, useRider, useVerification } from "@/lib/queries";
 
 export function Drive() {
   const rider = useRider();
   const trip = useActiveTrip();
   const goOnline = useGoOnline();
   const goOffline = useGoOffline();
+  const verification = useVerification();
+  // where verification is required, nobody goes online before they are approved
+  const blocked = verification.data?.required === true && verification.data.status !== "APPROVED";
 
   const [manual, setManualState] = useState<Fix | null>(loadManualPosition);
   const setManual = (fix: Fix | null) => {
@@ -79,7 +83,13 @@ export function Drive() {
           <p className="mt-1 text-sm text-muted">Go online to get trip requests near you. Your position is shared while you are online.</p>
           {problem ? <div className="mt-3"><ErrorNote>{problem}</ErrorNote></div> : null}
           {goOnline.error ? <div className="mt-3"><ErrorNote>{goOnline.error.message}</ErrorNote></div> : null}
-          <Button className="mt-4 w-full" busy={goOnline.isPending} onClick={beginShift}>
+          {blocked ? (
+            <p role="status" className="mt-3 rounded-lg bg-[var(--warn-bg)] px-3 py-2 text-sm text-[var(--warn-fg)]">
+              You can&apos;t go online until you&apos;re verified.{" "}
+              <Link href="/verification" className="font-medium underline">Open Verification</Link>
+            </p>
+          ) : null}
+          <Button className="mt-4 w-full" busy={goOnline.isPending} disabled={blocked} onClick={beginShift}>
             Go online
           </Button>
         </Card>

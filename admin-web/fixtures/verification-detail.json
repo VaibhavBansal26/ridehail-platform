@@ -1,0 +1,66 @@
+{
+  "riderId" : "1e5e4b4a-85f0-48a9-b704-738627f3c11e",
+  "name" : "Asha",
+  "phone" : "568e61cf-7f92-421f-8f64-df0f21baba93",
+  "vehicleType" : "SEDAN",
+  "verification" : {
+    "required" : true,
+    "status" : "PENDING_REVIEW",
+    "note" : null,
+    "submittedAt" : "2026-10-31T05:45:40.683449Z",
+    "reviewedAt" : null,
+    "requirements" : [ {
+      "type" : "DRIVING_LICENCE",
+      "label" : "Driving licence",
+      "needsExpiry" : true,
+      "imageOnly" : false
+    }, {
+      "type" : "VEHICLE_REGISTRATION",
+      "label" : "Vehicle registration",
+      "needsExpiry" : true,
+      "imageOnly" : false
+    }, {
+      "type" : "INSURANCE",
+      "label" : "Insurance certificate",
+      "needsExpiry" : true,
+      "imageOnly" : false
+    }, {
+      "type" : "SELFIE",
+      "label" : "Selfie",
+      "needsExpiry" : false,
+      "imageOnly" : true
+    } ],
+    "documents" : [ {
+      "type" : "DRIVING_LICENCE",
+      "label" : "Driving licence",
+      "contentType" : "image/jpeg",
+      "sizeBytes" : 17,
+      "uploadedAt" : "2026-10-31T05:45:40.683449Z",
+      "expiresOn" : "2027-12-05"
+    }, {
+      "type" : "VEHICLE_REGISTRATION",
+      "label" : "Vehicle registration",
+      "contentType" : "application/pdf",
+      "sizeBytes" : 18,
+      "uploadedAt" : "2026-10-31T05:45:40.683449Z",
+      "expiresOn" : "2027-12-05"
+    }, {
+      "type" : "INSURANCE",
+      "label" : "Insurance certificate",
+      "contentType" : "application/pdf",
+      "sizeBytes" : 18,
+      "uploadedAt" : "2026-10-31T05:45:40.683449Z",
+      "expiresOn" : "2027-12-05"
+    }, {
+      "type" : "SELFIE",
+      "label" : "Selfie",
+      "contentType" : "image/jpeg",
+      "sizeBytes" : 11,
+      "uploadedAt" : "2026-10-31T05:45:40.683449Z",
+      "expiresOn" : null
+    } ],
+    "missing" : [ ],
+    "canUpload" : false,
+    "canSubmit" : false
+  }
+}

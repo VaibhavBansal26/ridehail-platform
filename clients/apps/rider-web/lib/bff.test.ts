@@ -87,6 +87,33 @@ describe("forward", () => {
     expect(fetchMock).toHaveBeenCalledTimes(2);
   });
 
+  it("sends a document's bytes exactly as they are, with the right content type and the query", async () => {
+    fetchMock.mockResolvedValue(reply({ status: "NOT_SUBMITTED" }));
+    // every byte value, including the ones a text round trip would mangle
+    const bytes = Uint8Array.from({ length: 256 }, (_, i) => i);
+    const request = new NextRequest(`http://${HOST}/x?expiresOn=2030-01-01`, {
+      method: "PUT",
+      headers: { host: HOST, origin: `http://${HOST}`, [CSRF_HEADER]: CSRF_VALUE, "content-type": "application/octet-stream", cookie: `${ACCESS_COOKIE}=AT` },
+      body: bytes,
+    });
+    const res = await forward(request, "/api/riders/me/verification/documents/DRIVING_LICENCE");
+    expect(res.status).toBe(200);
+    const [url, init] = fetchMock.mock.calls[0]!;
+    expect(url).toBe("http://localhost:8080/api/riders/me/verification/documents/DRIVING_LICENCE?expiresOn=2030-01-01");
+    expect(init.headers["Content-Type"]).toBe("application/octet-stream");
+    expect(Array.from(init.body as Uint8Array)).toEqual(Array.from(bytes));
+  });
+
+  it("refuses an enormous upload without reading it or calling the API", async () => {
+    const request = new NextRequest(`http://${HOST}/x`, {
+      method: "PUT",
+      headers: { host: HOST, origin: `http://${HOST}`, [CSRF_HEADER]: CSRF_VALUE, "content-type": "application/octet-stream", "content-length": String(50 * 1024 * 1024), cookie: `${ACCESS_COOKIE}=AT` },
+      body: new Uint8Array([1]),
+    });
+    expect((await forward(request, "/api/riders/me/verification/documents/DRIVING_LICENCE")).status).toBe(413);
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("passes a 429 and its Retry-After through (location updates are rate limited)", async () => {
     fetchMock.mockResolvedValue(reply({ detail: "slow down" }, 429, { "retry-after": "3" }));
     const res = await forward(req("PUT", "/x", { cookies: { [ACCESS_COOKIE]: "AT" }, body: "{}" }), "/api/riders/me/location");

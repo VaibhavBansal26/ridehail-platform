@@ -32,6 +32,16 @@ public final class ApiExceptions {
         public long retryAfterSeconds() { return retryAfterSeconds; }
     }
 
+    /** The request itself is wrong (400), as opposed to wrong for the current state (409). */
+    public static class BadRequestException extends RuntimeException {
+        public BadRequestException(String message) { super(message); }
+    }
+    public static class PayloadTooLargeException extends RuntimeException {
+        public PayloadTooLargeException(String message) { super(message); }
+    }
+    public static class UnsupportedMediaException extends RuntimeException {
+        public UnsupportedMediaException(String message) { super(message); }
+    }
     public static class ForbiddenException extends RuntimeException {
         public ForbiddenException(String message) { super(message); }
     }

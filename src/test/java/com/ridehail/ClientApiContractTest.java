@@ -74,6 +74,9 @@ class ClientApiContractTest extends ApiTestBase {
         check("payout.json", payout);
         check("payouts.json", fetch("/api/riders/me/payouts", rider));
 
+        // verification: a rider who registered before it existed (or with it switched off) is approved and may drive
+        check("verification.json", fetch("/api/riders/me/verification", rider));
+
         // card setup (the simulated provider answers it the way Stripe would)
         // saving a card on the provider's hosted page
         JsonNode checkout = body(call(HttpMethod.POST, "/api/customers/me/payment-method/checkout", customer, null));

@@ -119,6 +119,41 @@ describe("devices", () => {
   });
 });
 
+describe("verification", () => {
+  const verification = {
+    required: true, status: "NOT_SUBMITTED", note: null, submittedAt: null, reviewedAt: null, canUpload: true, canSubmit: false,
+    requirements: [{ type: "DRIVING_LICENCE", label: "Driving licence", needsExpiry: true, imageOnly: false }],
+    documents: [], missing: ["DRIVING_LICENCE"],
+  };
+
+  it("reads the verification status", async () => {
+    const { api } = setup(() => json(verification));
+    expect((await api.rider.verification()).status).toBe("NOT_SUBMITTED");
+  });
+
+  it("sends a document as raw bytes, not JSON, with the expiry in the query", async () => {
+    const { api, calls } = setup(() => json(verification));
+    const bytes = new Uint8Array([0xff, 0xd8, 0xff, 0xe0]);
+    await api.rider.uploadDocument("DRIVING_LICENCE", bytes, "2030-05-01");
+    expect(calls[0]!.init.method).toBe("PUT");
+    expect(calls[0]!.url).toBe(`${BASE}/api/riders/me/verification/documents/DRIVING_LICENCE?expiresOn=2030-05-01`);
+    expect((calls[0]!.init.headers as Record<string, string>)["Content-Type"]).toBe("application/octet-stream");
+    expect(calls[0]!.init.body).toBe(bytes);               // not stringified
+  });
+
+  it("sends a selfie with no expiry in the query", async () => {
+    const { api, calls } = setup(() => json(verification));
+    await api.rider.uploadDocument("SELFIE", new Uint8Array([1]));
+    expect(calls[0]!.url).toBe(`${BASE}/api/riders/me/verification/documents/SELFIE`);
+  });
+
+  it("submits for review", async () => {
+    const { api, calls } = setup(() => json({ ...verification, status: "PENDING_REVIEW" }));
+    expect((await api.rider.submitVerification()).status).toBe("PENDING_REVIEW");
+    expect(calls[0]!.url).toBe(`${BASE}/api/riders/me/verification/submit`);
+  });
+});
+
 describe("token refresh", () => {
   it("refreshes once on 401, saves the new tokens and repeats the request", async () => {
     let first = true;

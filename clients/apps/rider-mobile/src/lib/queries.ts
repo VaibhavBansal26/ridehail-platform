@@ -1,5 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import type { DocumentType } from "@ridehail/api";
+import { MAX_DOCUMENT_BYTES } from "@ridehail/api";
 import { api } from "@/lib/api";
+import { type Picked, readPicked } from "@/lib/documents";
 
 // Pushes make these instant, but they are best-effort, so everything also polls slowly: REST is the source of truth.
 export const useRider = () => useQuery({ queryKey: ["rider"], queryFn: api.rider.me, refetchInterval: 30_000 });
@@ -47,4 +50,24 @@ export function useRequestPayout() {
 
 export function useStartOnboarding() {
   return useMutation({ mutationFn: api.rider.startPayoutOnboarding });
+}
+
+/** Whether this rider may drive, what is needed and what was sent. Polled slowly: a decision arrives as a notification too. */
+export const useVerification = () => useQuery({ queryKey: ["verification"], queryFn: api.rider.verification, refetchInterval: 30_000 });
+
+export function useUploadDocument() {
+  const refresh = useRefreshAll();
+  return useMutation({
+    mutationFn: async (v: { type: DocumentType; picked: Picked; expiresOn?: string }) => {
+      const read = await readPicked(v.picked, MAX_DOCUMENT_BYTES);
+      if ("error" in read) throw new Error(read.error);
+      return api.rider.uploadDocument(v.type, read.blob, v.expiresOn);
+    },
+    onSettled: refresh,
+  });
+}
+
+export function useSubmitVerification() {
+  const refresh = useRefreshAll();
+  return useMutation({ mutationFn: api.rider.submitVerification, onSettled: refresh });
 }

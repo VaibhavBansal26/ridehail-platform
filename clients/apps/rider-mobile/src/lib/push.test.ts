@@ -97,6 +97,9 @@ describe("unregisterPush", () => {
 describe("routeForNotification", () => {
   it("opens the right screen", () => {
     expect(routeForNotification({ type: "BANK_PAYOUT_FAILED" })).toBe("/earnings");
+    for (const type of ["VERIFICATION_APPROVED", "VERIFICATION_REJECTED", "VERIFICATION_SUSPENDED", "VERIFICATION_EXPIRING", "VERIFICATION_EXPIRED"]) {
+      expect(routeForNotification({ type })).toBe("/verification");
+    }
     for (const data of [{ type: "OFFER_RECEIVED" }, { type: "TRIP_ACCEPTED" }, {}, undefined]) expect(routeForNotification(data)).toBe("/");
   });
 });

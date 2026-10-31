@@ -5,7 +5,8 @@ import { DataTable, Empty, ErrorBox, Loading, PageHeader, Pager, Select, Td, use
 import { dateTime, relative, titleCase } from "@/lib/format";
 import { PAGE_SIZE, useAudit } from "@/lib/queries";
 
-const ACTIONS = ["TRIP_CANCELLED", "PAYMENT_RETRIED", "PAYMENT_REFUNDED", "INCIDENT_RESOLVED", "ADMIN_CREATED", "ADMIN_DISABLED", "ADMIN_ENABLED"];
+const ACTIONS = ["TRIP_CANCELLED", "PAYMENT_RETRIED", "PAYMENT_REFUNDED", "INCIDENT_RESOLVED", "ADMIN_CREATED", "ADMIN_DISABLED", "ADMIN_ENABLED",
+  "VERIFICATION_APPROVED", "VERIFICATION_REJECTED", "VERIFICATION_SUSPENDED", "VERIFICATION_REINSTATED", "VERIFICATION_DOCUMENT_VIEWED"];
 
 export default function AuditPage() {
   const [action, setAction] = useState("");

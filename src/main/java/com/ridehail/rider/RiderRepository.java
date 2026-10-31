@@ -22,7 +22,7 @@ public interface RiderRepository extends JpaRepository<Rider, UUID> {
 
     @Query("""
             select r from Rider r
-            where r.status = :status and r.vehicleType = :type
+            where r.status = :status and r.vehicleType = :type and r.verified = true
               and r.lat between :minLat and :maxLat and r.lon between :minLon and :maxLon
             """)
     List<Rider> findInBox(@Param("status") RiderStatus status, @Param("type") VehicleType type,
@@ -31,7 +31,7 @@ public interface RiderRepository extends JpaRepository<Rider, UUID> {
 
     @Query("""
             select count(r) from Rider r
-            where r.status = :status and r.vehicleType = :type
+            where r.status = :status and r.vehicleType = :type and r.verified = true
               and r.lat between :minLat and :maxLat and r.lon between :minLon and :maxLon
             """)
     long countInBox(@Param("status") RiderStatus status, @Param("type") VehicleType type,

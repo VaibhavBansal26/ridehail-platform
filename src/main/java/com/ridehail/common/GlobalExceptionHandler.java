@@ -50,6 +50,21 @@ public class GlobalExceptionHandler {
         return ProblemDetail.forStatusAndDetail(HttpStatus.FORBIDDEN, e.getMessage());
     }
 
+    @ExceptionHandler(ApiExceptions.BadRequestException.class)
+    ProblemDetail badRequest(ApiExceptions.BadRequestException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST, e.getMessage());
+    }
+
+    @ExceptionHandler(ApiExceptions.PayloadTooLargeException.class)
+    ProblemDetail tooLarge(ApiExceptions.PayloadTooLargeException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.PAYLOAD_TOO_LARGE, e.getMessage());
+    }
+
+    @ExceptionHandler(ApiExceptions.UnsupportedMediaException.class)
+    ProblemDetail unsupportedMedia(ApiExceptions.UnsupportedMediaException e) {
+        return ProblemDetail.forStatusAndDetail(HttpStatus.UNSUPPORTED_MEDIA_TYPE, e.getMessage());
+    }
+
     /** Two actors raced on the same row (e.g. double-accept); the loser gets a clean 409. */
     @ExceptionHandler(OptimisticLockingFailureException.class)
     ProblemDetail raced(OptimisticLockingFailureException e) {

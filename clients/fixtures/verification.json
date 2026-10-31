@@ -1,0 +1,32 @@
+{
+  "required" : false,
+  "status" : "APPROVED",
+  "note" : null,
+  "submittedAt" : null,
+  "reviewedAt" : "2026-10-31T05:43:26.184585Z",
+  "requirements" : [ {
+    "type" : "DRIVING_LICENCE",
+    "label" : "Driving licence",
+    "needsExpiry" : true,
+    "imageOnly" : false
+  }, {
+    "type" : "VEHICLE_REGISTRATION",
+    "label" : "Vehicle registration",
+    "needsExpiry" : true,
+    "imageOnly" : false
+  }, {
+    "type" : "INSURANCE",
+    "label" : "Insurance certificate",
+    "needsExpiry" : true,
+    "imageOnly" : false
+  }, {
+    "type" : "SELFIE",
+    "label" : "Selfie",
+    "needsExpiry" : false,
+    "imageOnly" : true
+  } ],
+  "documents" : [ ],
+  "missing" : [ "DRIVING_LICENCE", "VEHICLE_REGISTRATION", "INSURANCE", "SELFIE" ],
+  "canUpload" : false,
+  "canSubmit" : false
+}

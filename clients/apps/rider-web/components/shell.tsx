@@ -1,6 +1,6 @@
 "use client";
 
-import { LogOut, Wallet, Car } from "lucide-react";
+import { BadgeCheck, Car, LogOut, Wallet } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
@@ -8,16 +8,21 @@ import { useConnection } from "@/components/realtime";
 import { useNotices } from "@/components/notices";
 import { Badge, StatusBadge } from "@/components/ui";
 import { sessionCall } from "@/lib/api";
-import { useRider } from "@/lib/queries";
+import { useRider, useVerification } from "@/lib/queries";
 
 const NAV = [
   { href: "/", label: "Drive", icon: Car },
   { href: "/earnings", label: "Earnings", icon: Wallet },
 ] as const;
+const VERIFY = { href: "/verification", label: "Verify", icon: BadgeCheck } as const;
 
 export function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const rider = useRider();
+  const verification = useVerification();
+  // the tab exists only where verification is required; it is flagged until the rider is approved
+  const needsVerification = verification.data?.required === true;
+  const tabs = needsVerification ? [...NAV, VERIFY] : NAV;
   const connection = useConnection();
   const { notice, clear } = useNotices();
 
@@ -51,12 +56,15 @@ export function Shell({ children }: { children: ReactNode }) {
 
       <main className="flex-1 space-y-4 px-4 py-4">{children}</main>
 
-      <nav className="sticky bottom-0 grid grid-cols-2 border-t border-line bg-surface">
-        {NAV.map(({ href, label, icon: Icon }) => {
+      <nav className={`sticky bottom-0 grid border-t border-line bg-surface ${tabs.length === 3 ? "grid-cols-3" : "grid-cols-2"}`}>
+        {tabs.map(({ href, label, icon: Icon }) => {
           const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
           return (
             <Link key={href} href={href} aria-current={active ? "page" : undefined} className={`flex min-h-14 flex-col items-center justify-center gap-0.5 text-xs font-medium ${active ? "text-accent" : "text-muted"}`}>
-              <Icon className="size-5" aria-hidden />
+              <span className="relative">
+                <Icon className="size-5" aria-hidden />
+                {href === "/verification" && verification.data?.status !== "APPROVED" ? <span className="absolute -top-1 -right-1.5 size-2 rounded-full bg-[var(--bad-fg)]" aria-label="needs attention" /> : null}
+              </span>
               {label}
             </Link>
           );

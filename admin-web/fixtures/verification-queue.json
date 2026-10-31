@@ -1,0 +1,14 @@
+{
+  "items" : [ {
+    "riderId" : "1e5e4b4a-85f0-48a9-b704-738627f3c11e",
+    "name" : "Asha",
+    "phone" : "568e61cf-7f92-421f-8f64-df0f21baba93",
+    "vehicleType" : "SEDAN",
+    "status" : "PENDING_REVIEW",
+    "submittedAt" : "2026-10-31T05:45:40.683449Z",
+    "documents" : 4
+  } ],
+  "total" : 1,
+  "page" : 0,
+  "size" : 5
+}

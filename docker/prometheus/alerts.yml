@@ -49,6 +49,14 @@ groups:
           summary: "Riders have waited days for platform funds to settle"
           description: "Compare the platform's available balance at the provider with what riders are waiting for (admin panel > Overview)."
 
+      - alert: RiderVerificationsWaiting
+        expr: max(ridehail_verification_oldest_pending_seconds) > 2 * 86400
+        for: 30m
+        labels: {severity: ticket}
+        annotations:
+          summary: "A rider has waited over two days for their documents to be reviewed"
+          description: "Admin panel > Verification. Riders cannot earn until someone reviews them."
+
       - alert: PaymentsBacklog
         expr: max(ridehail_payments{status="PENDING"}) > 20
         for: 10m

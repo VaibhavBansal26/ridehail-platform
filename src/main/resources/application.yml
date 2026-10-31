@@ -82,6 +82,12 @@ ridehail:
     onboarding-refresh-url: ${STRIPE_ONBOARDING_REFRESH_URL:ridehail://payouts/retry}
     card-return-url: ${STRIPE_CARD_RETURN_URL:ridehail://card/done}
     card-cancel-url: ${STRIPE_CARD_CANCEL_URL:ridehail://card/cancelled}
+  verification:
+    # Riders must be approved (documents reviewed by an admin) before they can go online. A launch-time switch for NEW riders.
+    required: ${RIDER_VERIFICATION_REQUIRED:false}
+    max-document-bytes: 5242880
+    # base64 of 32 random bytes; dev/test fall back to a built-in key. The prod profile has no default.
+    encryption-key: ${DOCUMENT_ENCRYPTION_KEY:}
   notifications:
     # Phone notifications for when the app is closed. "none" sends nothing (development); "expo" sends through Expo's push service.
     provider: ${PUSH_PROVIDER:none}

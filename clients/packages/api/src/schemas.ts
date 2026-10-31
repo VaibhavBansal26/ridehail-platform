@@ -167,6 +167,44 @@ export const Payout = z.object({
 });
 export type Payout = z.infer<typeof Payout>;
 
+// ---------------------------------------------------------------- verification
+
+export const VerificationStatus = z.enum(["NOT_SUBMITTED", "PENDING_REVIEW", "APPROVED", "REJECTED", "SUSPENDED", "EXPIRED"]);
+export type VerificationStatus = z.infer<typeof VerificationStatus>;
+
+export const DocumentType = z.enum(["DRIVING_LICENCE", "VEHICLE_REGISTRATION", "INSURANCE", "SELFIE"]);
+export type DocumentType = z.infer<typeof DocumentType>;
+
+export const RequiredDocument = z.object({ type: DocumentType, label: z.string(), needsExpiry: z.boolean(), imageOnly: z.boolean() });
+export const VerificationDocument = z.object({
+  type: DocumentType,
+  label: z.string(),
+  contentType: z.string(),
+  sizeBytes: z.number(),
+  uploadedAt: instant,
+  expiresOn: z.string().nullish(), // YYYY-MM-DD
+});
+
+/** Where a rider stands: what is needed, what was sent, and whether they may drive. */
+export const Verification = z.object({
+  /** False where verification is switched off: the screens then have nothing to show. */
+  required: z.boolean(),
+  status: VerificationStatus,
+  /** Why it was rejected or suspended. */
+  note: z.string().nullish(),
+  submittedAt: instant.nullish(),
+  reviewedAt: instant.nullish(),
+  requirements: z.array(RequiredDocument),
+  documents: z.array(VerificationDocument),
+  missing: z.array(DocumentType),
+  canUpload: z.boolean(),
+  canSubmit: z.boolean(),
+});
+export type Verification = z.infer<typeof Verification>;
+
+/** Largest document the server accepts, in bytes (also checked on the device before a slow upload). */
+export const MAX_DOCUMENT_BYTES = 5 * 1024 * 1024;
+
 // ---------------------------------------------------------------- WebSocket pushes
 
 const trip = z.string().optional(); // money notices can arrive without a trip

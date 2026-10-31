@@ -14,7 +14,9 @@ import {
   Rider,
   RiderLocation,
   Trip,
+  type DocumentType,
   type VehicleType,
+  Verification,
 } from "./schemas";
 
 export interface ApiOptions {
@@ -28,6 +30,8 @@ interface Call {
   method: "GET" | "POST" | "PUT";
   path: string;
   body?: unknown;
+  /** A file's bytes, sent as they are (not JSON). */
+  raw?: Blob | ArrayBuffer | Uint8Array;
   /** Sign-in, registration and refresh are called without credentials and are never retried on 401. */
   anonymous?: boolean;
 }
@@ -49,13 +53,14 @@ export function createApi(opts: ApiOptions) {
   async function send(call: Call, authenticated: boolean): Promise<Response> {
     const headers: Record<string, string> = { Accept: "application/json" };
     if (call.body !== undefined) headers["Content-Type"] = "application/json";
+    if (call.raw !== undefined) headers["Content-Type"] = "application/octet-stream";
     if (authenticated) Object.assign(headers, await opts.auth.headers());
     try {
       return await doFetch(base + call.path, {
         method: call.method,
         headers,
         credentials: "same-origin",
-        body: call.body !== undefined ? JSON.stringify(call.body) : undefined,
+        body: call.raw !== undefined ? (call.raw as BodyInit) : call.body !== undefined ? JSON.stringify(call.body) : undefined,
       });
     } catch {
       throw new ApiError("Cannot reach the server. Check your connection.", 0);
@@ -149,6 +154,15 @@ export function createApi(opts: ApiOptions) {
       acceptOffer: (offerId: string) => post(`/api/riders/me/offers/${offerId}/accept`, nothing),
       declineOffer: (offerId: string) => post(`/api/riders/me/offers/${offerId}/decline`, nothing),
       earnings: () => get("/api/riders/me/earnings", Earnings),
+      /** Whether this rider may drive, what is needed, and what was sent. */
+      verification: () => get("/api/riders/me/verification", Verification),
+      /**
+       * Send one document (a JPEG, PNG or, except for the selfie, a PDF: the server checks what the bytes really are). The licence,
+       * registration and insurance need `expiresOn` (YYYY-MM-DD). Sending a type again replaces it.
+       */
+      uploadDocument: (type: DocumentType, file: Blob | ArrayBuffer | Uint8Array, expiresOn?: string) =>
+        request({ method: "PUT", path: `/api/riders/me/verification/documents/${type}${expiresOn ? `?expiresOn=${encodeURIComponent(expiresOn)}` : ""}`, raw: file }, Verification),
+      submitVerification: () => post("/api/riders/me/verification/submit", Verification),
       payouts: () => get("/api/riders/me/payouts", z.array(Payout)),
       /** Withdraw `amount`, or everything available when omitted. */
       requestPayout: (amount?: number) => post("/api/riders/me/payouts", Payout, amount === undefined ? undefined : { amount }),

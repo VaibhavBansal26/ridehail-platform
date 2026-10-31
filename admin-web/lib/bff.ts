@@ -132,10 +132,17 @@ export async function forward(req: NextRequest, path: string): Promise<NextRespo
     return out;
   }
 
-  const text = await upstream.text();
-  const out = new NextResponse(text || null, {
+  // bytes, not text: an identity document is a picture or a PDF and would be corrupted by a round trip through a string
+  const bytes = await upstream.arrayBuffer();
+  const passthrough: Record<string, string> = {};
+  // keep the headers that make a document safe to show: no sniffing, no caching, and a name
+  for (const h of ["content-disposition", "x-content-type-options", "content-security-policy"]) {
+    const v = upstream.headers.get(h);
+    if (v) passthrough[h] = v;
+  }
+  const out = new NextResponse(bytes.byteLength > 0 ? bytes : null, {
     status: upstream.status,
-    headers: { "Content-Type": upstream.headers.get("content-type") ?? "application/json", "Cache-Control": "no-store" },
+    headers: { ...passthrough, "Content-Type": upstream.headers.get("content-type") ?? "application/json", "Cache-Control": "no-store" },
   });
   if (renewed) setSession(out, renewed);
   return out;

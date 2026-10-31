@@ -30,6 +30,8 @@ public class Rider {
     private String providerAccountId;
     private double rating = 5.0;
     private Instant locationUpdatedAt;
+    /** May take trips. False for a rider who has not been approved (or was suspended, or whose documents expired). */
+    private boolean verified = true;
 
     public Rider(String name, String phone, VehicleType vehicleType) {
         this.name = name;
@@ -60,6 +62,7 @@ public class Rider {
     }
 
     public void release() {
-        if (status == RiderStatus.ON_TRIP) this.status = RiderStatus.AVAILABLE;
+        // a rider suspended (or expired) mid-trip finishes the trip and then stays off the road
+        if (status == RiderStatus.ON_TRIP) this.status = verified ? RiderStatus.AVAILABLE : RiderStatus.OFFLINE;
     }
 }

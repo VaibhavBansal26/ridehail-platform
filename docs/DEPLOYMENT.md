@@ -72,6 +72,24 @@ Built but **not** run here (a gap in this environment, not a known defect):
    a chargeback deadline is running.
 9. **Backups.** Schedule `scripts/backup-postgres.sh` (or your managed database's snapshots) and put the restore drill on a calendar.
 
+## Rider verification
+
+New riders upload four documents (driving licence, vehicle registration, insurance, selfie) and an admin approves them under
+*Verification* in the admin panel. Until then the rider cannot go online or be offered trips.
+
+- **`DOCUMENT_ENCRYPTION_KEY`** (base64 of 32 random bytes) has **no default in production**. Documents are encrypted with AES-256-GCM
+  before they reach the database. If the key is lost, every stored document is unreadable (riders would have to re-upload); keep an
+  offline copy in your secret manager. Rotating it needs a re-encryption job that does not exist yet.
+- **`RIDER_VERIFICATION_REQUIRED`** defaults to `true` in production. It only affects riders who sign up after it is set; existing riders
+  stay verified.
+- Documents are JPEG, PNG or PDF (checked by content, not file name), at most 5 MB. They live in Postgres (`rider_document_blobs`), so
+  they are in your backups, and the backup is as sensitive as the documents. There is no virus scan and no retention/deletion job:
+  decide your retention period before launch.
+- Every time an admin opens a document it is recorded in the audit log (`VERIFICATION_DOCUMENT_VIEWED`).
+- Insurance, licence and registration expiry is checked hourly: riders are warned 14 days ahead and taken offline when a document
+  expires. Uploads are accepted only while not submitted, rejected or expired (no early renewal), and phone apps upload photos only.
+- The `RiderVerificationsWaiting` alert fires when the oldest pending review is over two days old.
+
 ## Phone notifications
 
 A rider only hears about an offer while the app is open unless notifications are on. The server sends them through **Expo's push

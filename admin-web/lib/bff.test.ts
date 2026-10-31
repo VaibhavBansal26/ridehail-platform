@@ -66,6 +66,25 @@ describe("forward", () => {
     expect(setCookies(res)).toBe("");
   });
 
+  it("returns a document's bytes untouched, with the headers that make it safe to show", async () => {
+    // every byte value, including the ones a round trip through text would mangle
+    const bytes = Uint8Array.from({ length: 256 }, (_, i) => i);
+    fetchMock.mockResolvedValueOnce(new Response(bytes, {
+      status: 200,
+      headers: { "content-type": "image/jpeg", "content-disposition": 'inline; filename="driving_licence.jpg"', "x-content-type-options": "nosniff", "content-security-policy": "default-src 'none'; sandbox", "x-internal": "secret" },
+    }));
+    const res = await forward(req("GET", "/api/admin/verifications/x/documents/SELFIE", { cookies: { [ACCESS_COOKIE]: "AT" } }), "/api/admin/verifications/x/documents/SELFIE");
+
+    expect(res.status).toBe(200);
+    expect(Array.from(new Uint8Array(await res.arrayBuffer()))).toEqual(Array.from(bytes));
+    expect(res.headers.get("content-type")).toBe("image/jpeg");
+    expect(res.headers.get("content-disposition")).toBe('inline; filename="driving_licence.jpg"');
+    expect(res.headers.get("x-content-type-options")).toBe("nosniff");
+    expect(res.headers.get("content-security-policy")).toBe("default-src 'none'; sandbox");
+    expect(res.headers.get("cache-control")).toBe("no-store");      // an identity document is never cached
+    expect(res.headers.get("x-internal")).toBeNull();                // other upstream headers are not leaked
+  });
+
   it("forwards a JSON body on writes", async () => {
     fetchMock.mockResolvedValueOnce(json(200, { ok: true }));
     await forward(req("POST", "/api/admin/incidents/1/resolve", { cookies: { [ACCESS_COOKIE]: "AT" }, body: '{"note":"done"}' }), "/api/admin/incidents/1/resolve");

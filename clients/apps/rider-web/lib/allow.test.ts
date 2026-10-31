@@ -14,6 +14,10 @@ describe("what the rider app may ask the API for", () => {
     ["POST", `api/riders/me/offers/${ID}/accept`],
     ["POST", `api/riders/me/offers/${ID}/decline`],
     ["GET", "api/riders/me/earnings"],
+    ["GET", "api/riders/me/verification"],
+    ["PUT", "api/riders/me/verification/documents/DRIVING_LICENCE"],
+    ["PUT", "api/riders/me/verification/documents/SELFIE"],
+    ["POST", "api/riders/me/verification/submit"],
     ["GET", "api/riders/me/payouts"],
     ["POST", "api/riders/me/payouts"],
     ["POST", "api/riders/me/payout-account/onboarding"],
@@ -27,6 +31,13 @@ describe("what the rider app may ask the API for", () => {
   });
 
   it.each([
+    // verification: only the rider's own side, and only the four known documents
+    ["PUT", "api/riders/me/verification/documents/PASSPORT"],
+    ["GET", "api/riders/me/verification/documents/SELFIE"],
+    ["DELETE", "api/riders/me/verification/documents/SELFIE"],
+    ["POST", "api/riders/me/verification/approve"],
+    ["GET", `api/admin/verifications/${ID}/documents/SELFIE`],
+    ["POST", `api/admin/verifications/${ID}/approve`],
     // other roles' endpoints
     ["GET", "api/admin/trips"],
     ["POST", "api/admin/trips/" + ID + "/cancel"],

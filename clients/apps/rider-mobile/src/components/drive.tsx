@@ -10,7 +10,8 @@ import { api } from "@/lib/api";
 import { startBackgroundTracking, stopBackgroundTracking } from "@/lib/background";
 import { registerForPush } from "@/lib/push";
 import { manualPosition, phonePosition, useLocationReporter } from "@/lib/position";
-import { useActiveTrip, useGoOffline, useGoOnline, useOffers, useRider } from "@/lib/queries";
+import { type Href, Link } from "expo-router";
+import { useActiveTrip, useGoOffline, useGoOnline, useOffers, useRider, useVerification } from "@/lib/queries";
 
 export function Drive() {
   const t = useTheme();
@@ -18,6 +19,9 @@ export function Drive() {
   const trip = useActiveTrip();
   const goOnline = useGoOnline();
   const goOffline = useGoOffline();
+  const verification = useVerification();
+  // where verification is required, nobody goes online before they are approved
+  const blocked = verification.data?.required === true && verification.data.status !== "APPROVED";
 
   const [manual, setManual] = useState<Fix | null>(null);
   const source = useMemo(() => (manual ? manualPosition(manual) : phonePosition), [manual]);
@@ -82,7 +86,13 @@ export function Drive() {
           <Muted>Go online to get trip requests near you. Your position is shared while you are online.</Muted>
           {problem ? <ErrorNote>{problem}</ErrorNote> : null}
           {goOnline.error ? <ErrorNote>{goOnline.error.message}</ErrorNote> : null}
-          <Button label="Go online" busy={goOnline.isPending} onPress={() => void beginShift()} />
+          {blocked ? (
+            <Text accessibilityRole="alert" style={{ color: t.warnFg, fontSize: 14 }}>
+              You can&apos;t go online until you&apos;re verified.{" "}
+              <Link href={"/verification" as Href} style={{ textDecorationLine: "underline", fontWeight: "600" }}>Open Verification</Link>
+            </Text>
+          ) : null}
+          <Button label="Go online" busy={goOnline.isPending} disabled={blocked} onPress={() => void beginShift()} />
         </Card>
       ) : (
         <Card>

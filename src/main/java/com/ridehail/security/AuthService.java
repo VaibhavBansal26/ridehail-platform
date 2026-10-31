@@ -26,10 +26,12 @@ public class AuthService {
     private final PasswordEncoder passwords;
     private final JwtService jwt;
     private final Clock clock;
+    private final com.ridehail.verification.VerificationProperties verification;
     private final String dummyHash;
 
     AuthService(UserAccountRepository accounts, CustomerRepository customers, RiderRepository riders,
-                LedgerService ledger, PasswordEncoder passwords, JwtService jwt, Clock clock) {
+                LedgerService ledger, PasswordEncoder passwords, JwtService jwt, Clock clock,
+                com.ridehail.verification.VerificationProperties verification) {
         this.accounts = accounts;
         this.customers = customers;
         this.riders = riders;
@@ -37,6 +39,7 @@ public class AuthService {
         this.passwords = passwords;
         this.jwt = jwt;
         this.clock = clock;
+        this.verification = verification;
         this.dummyHash = passwords.encode("timing-equalizer");
     }
 
@@ -50,7 +53,9 @@ public class AuthService {
     @Transactional
     public AuthResult registerRider(String name, String phone, String password, VehicleType vehicleType) {
         requirePhoneFree(phone);
-        Rider r = riders.save(new Rider(name, phone, vehicleType));
+        Rider newRider = new Rider(name, phone, vehicleType);
+        newRider.setVerified(!verification.required());   // when verification is required, nobody drives before an admin approves them
+        Rider r = riders.save(newRider);
         ledger.openRiderAccount(r.getId()); // every rider has an earnings account from day one
         return register(phone, password, Role.RIDER, r.getId());
     }

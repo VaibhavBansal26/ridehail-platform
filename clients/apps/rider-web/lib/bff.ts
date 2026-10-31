@@ -10,6 +10,8 @@ import { ACCESS_COOKIE, CSRF_HEADER, CSRF_VALUE, REFRESH_COOKIE, SESSION_MAX_AGE
  */
 
 const BACKEND_TIMEOUT_MS = 15_000;
+/** A document upload may be a little over the API's own limit (5 MB); the API makes the real decision, this only stops a huge body early. */
+const MAX_UPLOAD_BYTES = 6 * 1024 * 1024;
 /** Hand out a fresh access token for the WebSocket when the current one has less than this left. */
 const MIN_TOKEN_LIFE_SECONDS = 90;
 
@@ -108,16 +110,21 @@ export async function forward(req: NextRequest, path: string): Promise<NextRespo
   const refresh = req.cookies.get(REFRESH_COOKIE)?.value;
   if (!access && !refresh) return json({ detail: "Not signed in" }, 401);
 
-  const body = req.method === "GET" || req.method === "HEAD" ? undefined : await req.text();
+  // a document is binary: it must travel as the bytes it is, never as text (which would corrupt a photo)
+  const binary = req.headers.get("content-type")?.startsWith("application/octet-stream") ?? false;
+  if (binary && Number(req.headers.get("content-length") ?? 0) > MAX_UPLOAD_BYTES) return json({ detail: "The file is too large" }, 413);
+  const body: string | Uint8Array | undefined =
+    req.method === "GET" || req.method === "HEAD" ? undefined : binary ? new Uint8Array(await req.arrayBuffer()) : await req.text();
+  if (binary && body && body.length > MAX_UPLOAD_BYTES) return json({ detail: "The file is too large" }, 413);
   const call = (token: string) =>
     backend(path + req.nextUrl.search, {
       method: req.method,
       headers: {
         Authorization: `Bearer ${token}`,
-        ...(body ? { "Content-Type": "application/json" } : {}),
+        ...(body && body.length > 0 ? { "Content-Type": binary ? "application/octet-stream" : "application/json" } : {}),
         Accept: "application/json",
       },
-      body: body || undefined,
+      body: body && body.length > 0 ? (body as BodyInit) : undefined,
     });
 
   let renewed: Tokens | null = null;
