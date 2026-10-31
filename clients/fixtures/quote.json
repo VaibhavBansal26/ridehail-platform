@@ -1,5 +1,5 @@
 {
-  "quoteId" : "3d8a6887-a838-4668-97c0-512af242b5b8",
+  "quoteId" : "54ff0560-cf49-42b1-b73b-c43f35c9efaf",
   "vehicleType" : "SEDAN",
   "distanceKm" : 6.740056708064438,
   "durationMin" : 16.176136099354654,
@@ -8,5 +8,5 @@
   "total" : 9.99,
   "currency" : "USD",
   "surgeActive" : false,
-  "expiresAt" : "2026-10-31T05:45:26.184585Z"
+  "expiresAt" : "2026-10-31T14:34:52.990732Z"
 }

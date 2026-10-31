@@ -47,6 +47,7 @@ class SecurityConfig {
                 .requestMatchers("/api/webhooks/**").permitAll() // authenticated by the provider's signature, not a JWT
                 .requestMatchers("/ws/**").permitAll() // handshake is open; the STOMP CONNECT frame must carry a JWT
                 .requestMatchers("/api/admin/**").hasRole("ADMIN")
+                .requestMatchers("/api/support/**").hasAnyRole("CUSTOMER", "RIDER") // people talk to support; staff answer under /api/admin/support
                 .requestMatchers("/api/riders/**").hasRole("RIDER")
                 .requestMatchers("/api/fares/**", "/api/customers/**").hasRole("CUSTOMER")
                 .requestMatchers(HttpMethod.POST, "/api/trips").hasRole("CUSTOMER")

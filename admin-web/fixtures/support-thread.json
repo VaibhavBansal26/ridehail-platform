@@ -1,0 +1,27 @@
+{
+  "conversation" : {
+    "id" : "061b5e44-1cbd-4b23-90a8-41748a6d4cfa",
+    "role" : "CUSTOMER",
+    "userId" : "d60e2c89-a042-4003-ac05-42044e614c2a",
+    "name" : "Ravi",
+    "phone" : "337cfa35-a7fc-4200-9813-521144844727",
+    "status" : "OPEN",
+    "awaitingReply" : false,
+    "awaitingSince" : null,
+    "lastPreview" : "Hi Ravi.",
+    "lastMessageAt" : "2026-10-31T15:51:51.963455Z"
+  },
+  "messages" : [ {
+    "id" : "77ebbaf1-324b-42d1-9605-111023aad76d",
+    "from" : "USER",
+    "body" : "Hello support.",
+    "tripId" : null,
+    "createdAt" : "2026-10-31T15:51:51.963454Z"
+  }, {
+    "id" : "d850a745-9505-4143-a4b0-57d0bad1cc1b",
+    "from" : "STAFF",
+    "body" : "Hi Ravi.",
+    "tripId" : null,
+    "createdAt" : "2026-10-31T15:51:51.963455Z"
+  } ]
+}

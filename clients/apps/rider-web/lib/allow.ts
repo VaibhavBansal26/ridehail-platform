@@ -18,6 +18,8 @@ const ALLOWED: [method: string, path: RegExp][] = [
   ["GET", /^riders\/me\/payouts$/],
   ["POST", /^riders\/me\/payouts$/],
   ["POST", /^riders\/me\/payout-account\/onboarding$/],
+  ["GET", /^support$/],
+  ["POST", /^support\/(messages|read)$/],
   ["GET", /^trips\/active$/],
   ["GET", new RegExp(`^trips/${UUID}$`)],
   ["POST", new RegExp(`^trips/${UUID}/(arrive|start|complete)$`)],

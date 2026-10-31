@@ -154,6 +154,31 @@ describe("verification", () => {
   });
 });
 
+describe("support chat", () => {
+  const conversation = { id: "c1", status: "OPEN", unread: 0, messages: [{ id: "m1", from: "USER", body: "Hi", tripId: null, createdAt: "2026-10-31T10:00:00Z" }] };
+
+  it("reads the conversation, including an empty one that has no id yet", async () => {
+    const { api } = setup(() => json({ id: null, status: "OPEN", unread: 0, messages: [] }));
+    expect((await api.support.conversation()).messages).toEqual([]);
+  });
+
+  it("sends a message, with the trip only when there is one", async () => {
+    const { api, calls } = setup(() => json(conversation, 201));
+    await api.support.send("Hi");
+    await api.support.send("About this", "t1");
+    expect(JSON.parse(String(calls[0]!.init.body))).toEqual({ body: "Hi" });
+    expect(JSON.parse(String(calls[1]!.init.body))).toEqual({ body: "About this", tripId: "t1" });
+    expect(calls[0]!.url).toBe(`${BASE}/api/support/messages`);
+  });
+
+  it("marks the conversation read", async () => {
+    const { api, calls } = setup(() => new Response(null, { status: 204 }));
+    await api.support.markRead();
+    expect(calls[0]!.url).toBe(`${BASE}/api/support/read`);
+    expect(calls[0]!.init.method).toBe("POST");
+  });
+});
+
 describe("token refresh", () => {
   it("refreshes once on 401, saves the new tokens and repeats the request", async () => {
     let first = true;

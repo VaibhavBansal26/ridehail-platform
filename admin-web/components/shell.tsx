@@ -3,12 +3,12 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { type ReactNode, useState } from "react";
-import { BadgeCheck, BookOpen, Car, History, UserCog, CreditCard, Gavel, LayoutDashboard, LogOut, Map, Menu, ShieldAlert, Users, X } from "lucide-react";
+import { BadgeCheck, BookOpen, LifeBuoy, Car, History, UserCog, CreditCard, Gavel, LayoutDashboard, LogOut, Map, Menu, ShieldAlert, Users, X } from "lucide-react";
 import { Badge } from "@/components/ui";
-import { useAttention, useVerificationQueue } from "@/lib/queries";
+import { useAttention, useSupportSummary, useVerificationQueue } from "@/lib/queries";
 import { CSRF_HEADER, CSRF_VALUE } from "@/lib/session";
 
-type Item = { href: string; label: string; icon: ReactNode; badge?: "disputes" | "incidents" | "payments" | "verification" };
+type Item = { href: string; label: string; icon: ReactNode; badge?: "disputes" | "incidents" | "payments" | "verification" | "support" };
 
 const NAV: Item[] = [
   { href: "/", label: "Overview", icon: <LayoutDashboard className="size-4" aria-hidden /> },
@@ -16,6 +16,7 @@ const NAV: Item[] = [
   { href: "/trips", label: "Trips", icon: <Car className="size-4" aria-hidden /> },
   { href: "/riders", label: "Riders", icon: <Users className="size-4" aria-hidden /> },
   { href: "/verification", label: "Verification", icon: <BadgeCheck className="size-4" aria-hidden />, badge: "verification" },
+  { href: "/support", label: "Support", icon: <LifeBuoy className="size-4" aria-hidden />, badge: "support" },
   { href: "/payments", label: "Payments", icon: <CreditCard className="size-4" aria-hidden />, badge: "payments" },
   { href: "/disputes", label: "Disputes", icon: <Gavel className="size-4" aria-hidden />, badge: "disputes" },
   { href: "/incidents", label: "Incidents", icon: <ShieldAlert className="size-4" aria-hidden />, badge: "incidents" },
@@ -32,8 +33,12 @@ export function Shell({ children }: { children: ReactNode }) {
   // riders waiting to be reviewed: someone who cannot start earning until a person looks
   const pending = useVerificationQueue("PENDING_REVIEW", 0).data?.total ?? 0;
 
+  // people waiting for an answer
+  const waiting = useSupportSummary().data?.awaiting ?? 0;
+
   const count = (b?: Item["badge"]) => {
     if (b === "verification") return pending;
+    if (b === "support") return waiting;
     if (!a || !b) return 0;
     if (b === "disputes") return a.disputes.open + a.disputes.inquiries;
     if (b === "incidents") return a.incidents.open;

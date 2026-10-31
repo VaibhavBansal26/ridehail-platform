@@ -1,0 +1,17 @@
+{
+  "items" : [ {
+    "id" : "3cf8e217-6a02-4aba-ae9c-906610c4f9a0",
+    "role" : "CUSTOMER",
+    "userId" : "167eee10-dd27-4014-af05-a0fa1cc31656",
+    "name" : "Ravi",
+    "phone" : "a55acb8f-702c-4533-8ad1-782704d6f8ff",
+    "status" : "OPEN",
+    "awaitingReply" : true,
+    "awaitingSince" : "2026-10-31T14:30:51.963454Z",
+    "lastPreview" : "fine again",
+    "lastMessageAt" : "2026-10-31T15:31:51.963453Z"
+  } ],
+  "total" : 8,
+  "page" : 0,
+  "size" : 1
+}

@@ -90,6 +90,20 @@ New riders upload four documents (driving licence, vehicle registration, insuran
   expires. Uploads are accepted only while not submitted, rejected or expired (no early renewal), and phone apps upload photos only.
 - The `RiderVerificationsWaiting` alert fires when the oldest pending review is over two days old.
 
+## Support chat
+
+Customers and riders have one running conversation with support (the *Support* tab in every app). Admins answer from *Support* in
+the admin panel, longest wait first; the person gets a push notification that says only that there is a reply, not what it says.
+
+- Messages are plain text, up to 2000 characters, 20 per person per hour. A message may name one of the sender's own trips.
+- A conversation marked resolved reopens when the person writes again. Nobody can read anyone else's conversation: the API only
+  ever returns the caller's own.
+- Staff replies and resolutions are in the audit log (without the message text).
+- **Not built, decide before launch:** staff assignment (everyone sees every conversation), attachments and photos, typing and read
+  receipts, live delivery (apps refresh every 15 seconds and on a push), and **retention**: messages are kept forever, and they can
+  contain personal details, so set a deletion period.
+- The `SupportUnanswered` alert fires when someone has waited over six hours; `ridehail_support_awaiting` is the queue length.
+
 ## Phone notifications
 
 A rider only hears about an offer while the app is open unless notifications are on. The server sends them through **Expo's push

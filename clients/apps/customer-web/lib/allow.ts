@@ -10,6 +10,8 @@ const ALLOWED: [method: string, path: RegExp][] = [
   ["POST", /^customers\/me\/payment-method\/checkout$/],
   ["POST", /^fares\/quote$/],
   ["POST", /^trips$/],
+  ["GET", /^support$/],
+  ["POST", /^support\/(messages|read)$/],
   ["GET", /^trips\/active$/],
   ["GET", new RegExp(`^trips/${UUID}$`)],
   ["GET", new RegExp(`^trips/${UUID}/rider-location$`)],

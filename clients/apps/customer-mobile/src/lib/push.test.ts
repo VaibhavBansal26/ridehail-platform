@@ -97,6 +97,7 @@ describe("unregisterPush", () => {
 describe("routeForNotification", () => {
   it("opens the right screen", () => {
     expect(routeForNotification({ type: "PAYMENT_FAILED" })).toBe("/account");
+    expect(routeForNotification({ type: "SUPPORT_REPLY" })).toBe("/support");
     for (const data of [{ type: "OFFER_RECEIVED" }, { type: "TRIP_ACCEPTED" }, {}, undefined]) expect(routeForNotification(data)).toBe("/");
   });
 });

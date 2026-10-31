@@ -77,3 +77,15 @@ export function useSubmitVerification() {
   const refresh = useRefreshAll();
   return useMutation({ mutationFn: api.rider.submitVerification, onSettled: refresh });
 }
+
+export const useSupport = () => useQuery({ queryKey: ["support"], queryFn: api.support.conversation, refetchInterval: 15_000 });
+
+export function useSendSupport() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: (body: string) => api.support.send(body), onSuccess: (conversation) => qc.setQueryData(["support"], conversation) });
+}
+
+export function useMarkSupportRead() {
+  const qc = useQueryClient();
+  return useMutation({ mutationFn: api.support.markRead, onSuccess: () => qc.invalidateQueries({ queryKey: ["support"] }) });
+}

@@ -327,3 +327,32 @@ export const DisputeEvidence = z.object({
 });
 export type DisputeEvidence = z.infer<typeof DisputeEvidence>;
 export const EVIDENCE_LIMIT = 5000;
+
+// ---------------------------------------------------------------- support chat
+
+export const SupportInboxItem = z.object({
+  id: z.string(),
+  role: z.enum(["CUSTOMER", "RIDER"]),
+  userId: z.string(),
+  name: z.string().nullish(),
+  phone: z.string().nullish(),
+  status: z.enum(["OPEN", "RESOLVED"]),
+  awaitingReply: z.boolean(),
+  awaitingSince: z.string().nullish(),
+  lastPreview: z.string().nullish(),
+  lastMessageAt: z.string(),
+});
+export type SupportInboxItem = z.infer<typeof SupportInboxItem>;
+export const SupportInbox = page(SupportInboxItem);
+
+export const SupportMessage = z.object({
+  id: z.string(),
+  from: z.enum(["USER", "STAFF"]),
+  body: z.string(),
+  tripId: z.string().nullish(),
+  createdAt: z.string(),
+});
+export const SupportThread = z.object({ conversation: SupportInboxItem, messages: z.array(SupportMessage) });
+export type SupportThread = z.infer<typeof SupportThread>;
+export const SupportSummary = z.object({ awaiting: z.number(), oldestWaitingSeconds: z.number() });
+export const SUPPORT_LIMIT = 2000;

@@ -70,6 +70,7 @@ export async function unregisterPush(): Promise<void> {
 }
 
 /** Where tapping a notification should go. */
-export function routeForNotification(data: Record<string, unknown> | undefined): "/" | "/account" {
+export function routeForNotification(data: Record<string, unknown> | undefined): "/" | "/account" | "/support" {
+  if (data?.type === "SUPPORT_REPLY") return "/support";
   return data?.type === "PAYMENT_FAILED" ? "/account" : "/";
 }

@@ -1,0 +1,18 @@
+{
+  "id" : "91aacdd9-8770-4a2c-9459-31e6a29c32a3",
+  "status" : "OPEN",
+  "unread" : 1,
+  "messages" : [ {
+    "id" : "0bd5ff19-67a8-4bae-bf9a-b7e48ca774bf",
+    "from" : "USER",
+    "body" : "Where is my receipt?",
+    "tripId" : null,
+    "createdAt" : "2026-10-31T14:32:52.990733Z"
+  }, {
+    "id" : "0ca6aa13-09fb-48eb-b8d0-4a00022e2fe3",
+    "from" : "STAFF",
+    "body" : "It is in your email.",
+    "tripId" : null,
+    "createdAt" : "2026-10-31T14:32:52.990734Z"
+  } ]
+}

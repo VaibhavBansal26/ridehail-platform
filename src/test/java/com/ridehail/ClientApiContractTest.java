@@ -2,10 +2,12 @@ package com.ridehail;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.awaitility.Awaitility.await;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.ridehail.payment.PaymentStatus;
 import java.time.Duration;
+import java.util.stream.StreamSupport;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpMethod;
@@ -76,6 +78,14 @@ class ClientApiContractTest extends ApiTestBase {
 
         // verification: a rider who registered before it existed (or with it switched off) is approved and may drive
         check("verification.json", fetch("/api/riders/me/verification", rider));
+
+        // support chat: a message from the customer and the answer from an admin
+        call(HttpMethod.POST, "/api/support/messages", customer, "{\"body\":\"Where is my receipt?\"}").andExpect(status().isCreated());
+        Actor staff = admin();
+        String thread = StreamSupport.stream(fetch("/api/admin/support?filter=awaiting&size=100", staff).get("items").spliterator(), false)
+                .filter(i -> i.get("userId").asText().equals(customer.id().toString())).findFirst().orElseThrow().get("id").asText();
+        call(HttpMethod.POST, "/api/admin/support/" + thread + "/reply", staff, "{\"body\":\"It is in your email.\"}").andExpect(status().isCreated());
+        check("support.json", fetch("/api/support", customer));
 
         // card setup (the simulated provider answers it the way Stripe would)
         // saving a card on the provider's hosted page

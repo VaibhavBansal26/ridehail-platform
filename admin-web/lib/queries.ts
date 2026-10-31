@@ -17,6 +17,9 @@ import {
   TripDetail,
   TripPage,
   DisputeEvidence,
+  SupportInbox,
+  SupportSummary,
+  SupportThread,
   VerificationDetail,
   VerificationQueue,
 } from "@/lib/schemas";
@@ -134,3 +137,17 @@ export const useDisputeEvidence = (id: string) =>
   useQuery({ queryKey: ["dispute-evidence", id], queryFn: () => get(`disputes/${id}/evidence`, DisputeEvidence) });
 export const useSaveEvidence = () => useAction((v: { id: string; explanation: string }) => post(`disputes/${v.id}/evidence`, { explanation: v.explanation }));
 export const useSubmitEvidence = () => useAction((id: string) => post(`disputes/${id}/evidence/submit`));
+
+export const useSupportInbox = (filter: string, page: number) =>
+  useQuery({
+    queryKey: ["support-inbox", filter, page],
+    queryFn: () => get("support" + query({ filter, page, size: PAGE_SIZE }), SupportInbox),
+    placeholderData: keepPreviousData,
+    refetchInterval: 15_000,
+  });
+export const useSupportSummary = () =>
+  useQuery({ queryKey: ["support-summary"], queryFn: () => get("support/summary", SupportSummary), refetchInterval: 30_000 });
+export const useSupportThread = (id: string) =>
+  useQuery({ queryKey: ["support-thread", id], queryFn: () => get(`support/${id}`, SupportThread), refetchInterval: 10_000 });
+export const useSupportReply = () => useAction((v: { id: string; body: string }) => post(`support/${v.id}/reply`, { body: v.body }));
+export const useSupportResolve = () => useAction((id: string) => post(`support/${id}/resolve`));

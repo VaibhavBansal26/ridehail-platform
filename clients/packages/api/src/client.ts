@@ -16,6 +16,7 @@ import {
   Trip,
   type DocumentType,
   type VehicleType,
+  SupportConversation,
   Verification,
 } from "./schemas";
 
@@ -126,6 +127,15 @@ export function createApi(opts: ApiOptions) {
     devices: {
       register: (token: string, platform: "ios" | "android") => request({ method: "PUT", path: "/api/devices", body: { token, platform } }, nothing),
       unregister: (token: string) => post("/api/devices/unregister", nothing, { token }),
+    },
+
+    /** Chat with support, for customers and riders alike. Staff answer from the admin panel; a push arrives when they do. */
+    support: {
+      conversation: () => get("/api/support", SupportConversation),
+      /** Optionally about one of the sender's own trips. Returns the updated conversation. */
+      send: (body: string, tripId?: string) => post("/api/support/messages", SupportConversation, { body, ...(tripId && { tripId }) }),
+      /** The person has opened the conversation: clears `unread`. */
+      markRead: () => post("/api/support/read", nothing),
     },
 
     customer: {

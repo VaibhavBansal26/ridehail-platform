@@ -205,6 +205,31 @@ export type Verification = z.infer<typeof Verification>;
 /** Largest document the server accepts, in bytes (also checked on the device before a slow upload). */
 export const MAX_DOCUMENT_BYTES = 5 * 1024 * 1024;
 
+// ---------------------------------------------------------------- support chat
+
+export const SupportMessage = z.object({
+  id: z.string(),
+  from: z.enum(["USER", "STAFF"]),
+  body: z.string(),
+  tripId: z.string().nullish(),
+  createdAt: instant,
+});
+export type SupportMessage = z.infer<typeof SupportMessage>;
+
+/** The one running conversation a customer or rider has with support (empty until they write). */
+export const SupportConversation = z.object({
+  id: z.string().nullish(),
+  status: z.enum(["OPEN", "RESOLVED"]),
+  /** Replies from support the person has not opened yet. */
+  unread: z.number(),
+  /** Oldest first; the most recent 100. */
+  messages: z.array(SupportMessage),
+});
+export type SupportConversation = z.infer<typeof SupportConversation>;
+
+/** Longest message the server accepts, in characters. */
+export const MAX_SUPPORT_MESSAGE = 2000;
+
 // ---------------------------------------------------------------- WebSocket pushes
 
 const trip = z.string().optional(); // money notices can arrive without a trip

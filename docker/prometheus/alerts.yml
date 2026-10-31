@@ -57,6 +57,14 @@ groups:
           summary: "A rider has waited over two days for their documents to be reviewed"
           description: "Admin panel > Verification. Riders cannot earn until someone reviews them."
 
+      - alert: SupportUnanswered
+        expr: max(ridehail_support_oldest_waiting_seconds) > 6 * 3600
+        for: 15m
+        labels: {severity: ticket}
+        annotations:
+          summary: "Someone has waited over six hours for a support reply"
+          description: "Admin panel > Support."
+
       - alert: PaymentsBacklog
         expr: max(ridehail_payments{status="PENDING"}) > 20
         for: 10m

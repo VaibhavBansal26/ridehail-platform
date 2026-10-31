@@ -11,6 +11,7 @@ finance incidents, and one "needs attention" summary that tells you whether anyt
 | Trips / trip detail | Filter by status. Detail shows names, fare, the timeline, the payment, every dispatch offer sent to riders and what each answered, and disputes. **Cancel trip** (with confirmation). |
 | Riders | Status, rating, last position and whether they are still reporting. |
 | Payments / payouts | Charges with **Retry** (stuck) and **Refund** (captured), both behind a confirmation; payouts with how long each has been waiting for funds. |
+| Support | Conversations with customers and riders: who is waiting and for how long, the thread (plain text), reply, mark resolved. A badge in the menu counts people waiting. |
 | Disputes | Status, amount, reason, evidence deadline (overdue ones in red), what the ledger did, an **Answer** page (facts from the trip, your explanation, submit once) and a link into the payment provider's dashboard (only `https://*.stripe.com` links are ever offered). Evidence itself is submitted there, not here. |
 | Incidents | Failed bank payouts, reversed transfers, failed refunds. **Resolve** records what was done (it moves no money). |
 | Ledger | The trial balance by account type and whether debits equal credits. |

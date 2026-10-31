@@ -10,6 +10,9 @@ describe("what the customer app may ask the API for", () => {
     ["POST", "api/customers/me/payment-method/checkout"],
     ["POST", "api/fares/quote"],
     ["POST", "api/trips"],
+    ["GET", "api/support"],
+    ["POST", "api/support/messages"],
+    ["POST", "api/support/read"],
     ["GET", "api/trips/active"],
     ["GET", `api/trips/${ID}`],
     ["GET", `api/trips/${ID}/rider-location`],
@@ -20,6 +23,14 @@ describe("what the customer app may ask the API for", () => {
 
   it.each([
     // other roles' endpoints
+    // support: the person's own side only, never the staff inbox
+    ["GET", "api/admin/support"],
+    ["GET", `api/admin/support/${ID}`],
+    ["POST", `api/admin/support/${ID}/reply`],
+    ["POST", `api/admin/support/${ID}/resolve`],
+    ["DELETE", "api/support"],
+    ["GET", "api/support/messages"],
+    ["POST", "api/support"],
     ["GET", "api/admin/trips"],
     ["POST", `api/admin/trips/${ID}/cancel`],
     ["GET", "api/riders/me"],

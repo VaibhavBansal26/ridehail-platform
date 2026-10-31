@@ -1,6 +1,6 @@
 "use client";
 
-import { Car, CreditCard, LogOut } from "lucide-react";
+import { Car, CreditCard, LifeBuoy, LogOut } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
@@ -8,16 +8,18 @@ import { useConnection } from "@/components/realtime";
 import { useNotices } from "@/components/notices";
 import { Badge } from "@/components/ui";
 import { sessionCall } from "@/lib/api";
-import { useCustomer } from "@/lib/queries";
+import { useCustomer, useSupport } from "@/lib/queries";
 
 const NAV = [
   { href: "/", label: "Ride", icon: Car },
   { href: "/account", label: "Account", icon: CreditCard },
+  { href: "/support", label: "Support", icon: LifeBuoy },
 ] as const;
 
 export function Shell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const customer = useCustomer();
+  const supportUnread = (useSupport().data?.unread ?? 0) > 0;
   const connection = useConnection();
   const { notice, clear } = useNotices();
 
@@ -50,12 +52,15 @@ export function Shell({ children }: { children: ReactNode }) {
 
       <main className="flex-1 space-y-4 px-4 py-4">{children}</main>
 
-      <nav className="sticky bottom-0 grid grid-cols-2 border-t border-line bg-surface">
+      <nav className="sticky bottom-0 grid grid-cols-3 border-t border-line bg-surface">
         {NAV.map(({ href, label, icon: Icon }) => {
           const active = href === "/" ? pathname === "/" : pathname.startsWith(href);
           return (
             <Link key={href} href={href} aria-current={active ? "page" : undefined} className={`flex min-h-14 flex-col items-center justify-center gap-0.5 text-xs font-medium ${active ? "text-accent" : "text-muted"}`}>
-              <Icon className="size-5" aria-hidden />
+              <span className="relative">
+                <Icon className="size-5" aria-hidden />
+                {href === "/support" && supportUnread ? <span className="absolute -top-1 -right-1.5 size-2 rounded-full bg-[var(--bad-fg)]" aria-label="new reply" /> : null}
+              </span>
               {label}
             </Link>
           );
