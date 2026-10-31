@@ -1,7 +1,7 @@
 {
-  "id" : "902dcd72-471d-48e0-958b-0a77f57cc5a8",
+  "id" : "964b3b90-0c1f-4312-b9a5-45e4a15a105a",
   "status" : "REQUESTED",
-  "customerId" : "fee339db-afa1-40e7-9b3a-1c69cdb4c9ae",
+  "customerId" : "2c73fee7-cdc2-445a-ab54-4fd17d52dfcc",
   "riderId" : null,
   "vehicleType" : "SEDAN",
   "fare" : 9.99,
@@ -10,5 +10,8 @@
   "pickupLat" : 12.9716,
   "pickupLon" : 77.5946,
   "dropLat" : 12.9352,
-  "dropLon" : 77.6245
+  "dropLon" : 77.6245,
+  "riderName" : null,
+  "riderVehicleType" : null,
+  "paymentStatus" : null
 }

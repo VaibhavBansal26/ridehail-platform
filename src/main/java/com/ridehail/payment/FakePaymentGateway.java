@@ -83,6 +83,12 @@ public class FakePaymentGateway implements PaymentGateway, OnboardingGateway {
     }
 
     @Override
+    public CardCheckout beginCardCheckout(UUID customerId, String existing) {
+        return new CardCheckout(existing != null ? existing : "cus_fake_" + customerId,
+                "https://example.test/fake-card-checkout", Instant.now().plusSeconds(1800));
+    }
+
+    @Override
     public PayoutOnboarding beginPayoutOnboarding(UUID riderId, String existing) {
         return new PayoutOnboarding(existing != null ? existing : "acct_fake_" + riderId,
                 "https://example.test/fake-onboarding", Instant.now().plusSeconds(300));

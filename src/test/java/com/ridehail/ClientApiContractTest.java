@@ -75,6 +75,10 @@ class ClientApiContractTest extends ApiTestBase {
         check("payouts.json", fetch("/api/riders/me/payouts", rider));
 
         // card setup (the simulated provider answers it the way Stripe would)
+        // saving a card on the provider's hosted page
+        JsonNode checkout = body(call(HttpMethod.POST, "/api/customers/me/payment-method/checkout", customer, null));
+        assertThat(checkout.get("url").asText()).startsWith("https://");
+        check("card-checkout.json", checkout);
         check("card-setup.json", body(call(HttpMethod.POST, "/api/customers/me/payment-method/setup", customer, null)));
     }
 }

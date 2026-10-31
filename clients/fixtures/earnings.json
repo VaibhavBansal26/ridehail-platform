@@ -6,10 +6,10 @@
   "hasPayoutAccount" : false,
   "payoutBlockedReason" : null,
   "recent" : [ {
-    "at" : "2026-10-31T00:06:40.981541Z",
+    "at" : "2026-10-31T01:42:33.235681Z",
     "direction" : "CREDIT",
     "amount" : 7.99,
     "kind" : "PAYMENT_CAPTURE",
-    "description" : "Trip 902dcd72-471d-48e0-958b-0a77f57cc5a8"
+    "description" : "Trip 964b3b90-0c1f-4312-b9a5-45e4a15a105a"
   } ]
 }

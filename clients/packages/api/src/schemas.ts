@@ -78,6 +78,9 @@ export const Quote = z.object({
 });
 export type Quote = z.infer<typeof Quote>;
 
+export const PaymentStatus = z.enum(["PENDING", "CAPTURED", "REQUIRES_ATTENTION", "REFUNDED", "DISPUTED", "CHARGED_BACK"]);
+export type PaymentStatus = z.infer<typeof PaymentStatus>;
+
 export const Trip = z.object({
   id: z.string(),
   status: TripStatus,
@@ -91,6 +94,11 @@ export const Trip = z.object({
   pickupLon: z.number(),
   dropLat: z.number(),
   dropLon: z.number(),
+  /** Who is coming (name and vehicle only), once a rider has accepted. */
+  riderName: z.string().nullish(),
+  riderVehicleType: VehicleType.nullish(),
+  /** How the charge for a finished trip stands, once there is one. */
+  paymentStatus: z.string().nullish(),
 });
 export type Trip = z.infer<typeof Trip>;
 
@@ -120,6 +128,9 @@ export type Offer = z.infer<typeof Offer>;
 
 export const CardSetup = z.object({ clientSecret: z.string(), publishableKey: z.string().nullish() });
 export type CardSetup = z.infer<typeof CardSetup>;
+
+export const CardCheckout = z.object({ url: z.string(), expiresAt: instant });
+export type CardCheckout = z.infer<typeof CardCheckout>;
 
 export const PayoutOnboarding = z.object({ url: z.string(), expiresAt: instant });
 export type PayoutOnboarding = z.infer<typeof PayoutOnboarding>;

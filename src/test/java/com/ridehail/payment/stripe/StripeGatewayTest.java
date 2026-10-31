@@ -39,7 +39,7 @@ class StripeGatewayTest {
 
     static StripeGateway gatewayFor(String baseUrl) {
         return new StripeGateway(new StripeProperties("sk_test_key", "whsec_x", "pk_test_x", baseUrl, 0, "US",
-                "ridehail://done", "ridehail://retry"));
+                "ridehail://done", "ridehail://retry", "ridehail://card/done", "ridehail://card/cancelled"));
     }
 
     // ---------------------------------------------------------------- charges
@@ -256,6 +256,39 @@ class StripeGatewayTest {
     }
 
     @Test
+    void hostedCardCheckoutIsASetupSessionForTheStripeCustomerWithOurReturnLinks() {
+        UUID customerId = UUID.randomUUID();
+        stub.reply("POST /v1/customers", 200, "{\"id\":\"cus_new\",\"object\":\"customer\"}");
+        stub.reply("POST /v1/checkout/sessions", 200,
+                "{\"id\":\"cs_1\",\"object\":\"checkout.session\",\"url\":\"https://checkout.stripe.com/c/pay/cs_1\",\"expires_at\":1893456000}");
+
+        var checkout = gateway.beginCardCheckout(customerId, null);
+
+        assertThat(checkout.providerCustomerId()).isEqualTo("cus_new");
+        assertThat(checkout.url()).isEqualTo("https://checkout.stripe.com/c/pay/cs_1");
+        assertThat(checkout.expiresAt()).isEqualTo(java.time.Instant.ofEpochSecond(1893456000));
+        var session = stub.only("POST /v1/checkout/sessions");
+        assertThat(session.form("mode")).isEqualTo("setup");
+        assertThat(session.form("customer")).isEqualTo("cus_new");
+        assertThat(session.form("success_url")).isEqualTo("ridehail://card/done");
+        assertThat(session.form("cancel_url")).isEqualTo("ridehail://card/cancelled");
+        assertThat(session.form("setup_intent_data[metadata][ridehail_customer_id]")).isEqualTo(customerId.toString());
+
+        // a known Stripe customer is reused
+        stub.reset();
+        stub.reply("POST /v1/checkout/sessions", 200,
+                "{\"id\":\"cs_2\",\"object\":\"checkout.session\",\"url\":\"https://checkout.stripe.com/c/pay/cs_2\",\"expires_at\":1893456000}");
+        assertThat(gateway.beginCardCheckout(customerId, "cus_new").providerCustomerId()).isEqualTo("cus_new");
+        assertThat(stub.calls("POST /v1/customers")).isEmpty();
+    }
+
+    @Test
+    void aFailedCardCheckoutIsABadGatewayNotAServerError() {
+        stub.reply("POST /v1/checkout/sessions", 500, "{\"error\":{\"message\":\"boom\"}}");
+        assertThatThrownBy(() -> gateway.beginCardCheckout(UUID.randomUUID(), "cus_new")).isInstanceOf(BadGatewayException.class);
+    }
+
+    @Test
     void payoutOnboardingCreatesAnExpressAccountThatCanReceiveTransfersAndALink() {
         UUID riderId = UUID.randomUUID();
         stub.reply("POST /v1/accounts", 200, "{\"id\":\"acct_1\",\"object\":\"account\"}");
@@ -301,9 +334,9 @@ class StripeGatewayTest {
 
     @Test
     void theGatewayRefusesToStartWithoutCredentials() {
-        assertThatThrownBy(() -> new StripeGateway(new StripeProperties("", "whsec", "pk", null, 0, null, "a", "b")))
+        assertThatThrownBy(() -> new StripeGateway(new StripeProperties("", "whsec", "pk", null, 0, null, "a", "b", "c", "d")))
                 .isInstanceOf(IllegalStateException.class);
-        assertThatThrownBy(() -> new StripeGateway(new StripeProperties("sk", "", "pk", null, 0, null, "a", "b")))
+        assertThatThrownBy(() -> new StripeGateway(new StripeProperties("sk", "", "pk", null, 0, null, "a", "b", "c", "d")))
                 .isInstanceOf(IllegalStateException.class);
     }
 

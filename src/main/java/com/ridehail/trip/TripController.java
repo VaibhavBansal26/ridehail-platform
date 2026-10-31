@@ -1,6 +1,9 @@
 package com.ridehail.trip;
 
 import com.ridehail.common.VehicleType;
+import com.ridehail.payment.PaymentRepository;
+import com.ridehail.payment.PaymentStatus;
+import com.ridehail.rider.RiderRepository;
 import com.ridehail.security.CurrentUser;
 import com.ridehail.security.Role;
 import jakarta.validation.Valid;
@@ -19,41 +22,54 @@ import org.springframework.web.bind.annotation.*;
 class TripController {
 
     private final TripService trips;
+    private final RiderRepository riders;
+    private final PaymentRepository payments;
 
-    TripController(TripService trips) {
+    TripController(TripService trips, RiderRepository riders, PaymentRepository payments) {
         this.trips = trips;
+        this.riders = riders;
+        this.payments = payments;
     }
 
     record BookRequest(@NotNull UUID quoteId) {}
 
     record TripResponse(UUID id, TripStatus status, UUID customerId, UUID riderId, VehicleType vehicleType,
                         BigDecimal fare, BigDecimal surgeMultiplier, String currency,
-                        double pickupLat, double pickupLon, double dropLat, double dropLon) {
-        static TripResponse of(Trip t) {
-            return new TripResponse(t.getId(), t.getStatus(), t.getCustomerId(), t.getRiderId(),
-                    t.getVehicleType(), t.getFare(), t.getSurgeMultiplier(), t.getCurrency(),
-                    t.getPickupLat(), t.getPickupLon(), t.getDropLat(), t.getDropLon());
-        }
+                        double pickupLat, double pickupLon, double dropLat, double dropLon,
+                        /** Who is coming (name and vehicle only), once a rider has accepted. */
+                        String riderName, VehicleType riderVehicleType,
+                        /** How the charge for a finished trip stands (PENDING, CAPTURED, REQUIRES_ATTENTION...), else null. */
+                        PaymentStatus paymentStatus) {}
+
+    /** One trip as the apps see it: the trip, plus the rider's name and vehicle, plus the payment once there is one. */
+    private TripResponse view(Trip t) {
+        var rider = t.getRiderId() == null ? null : riders.findById(t.getRiderId()).orElse(null);
+        var payment = payments.findByTripId(t.getId()).orElse(null);
+        return new TripResponse(t.getId(), t.getStatus(), t.getCustomerId(), t.getRiderId(),
+                t.getVehicleType(), t.getFare(), t.getSurgeMultiplier(), t.getCurrency(),
+                t.getPickupLat(), t.getPickupLon(), t.getDropLat(), t.getDropLon(),
+                rider != null ? rider.getName() : null, rider != null ? rider.getVehicleType() : null,
+                payment != null ? payment.getStatus() : null);
     }
 
     /** Customer books the quoted fare; the nearest rider is offered the trip. */
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
     TripResponse book(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody BookRequest r) {
-        return TripResponse.of(trips.request(CurrentUser.profileId(jwt), r.quoteId()));
+        return view(trips.request(CurrentUser.profileId(jwt), r.quoteId()));
     }
 
     /** The caller's current trip (customer or rider), or 204 when there is none. */
     @GetMapping("/active")
     ResponseEntity<TripResponse> active(@AuthenticationPrincipal Jwt jwt) {
         return trips.activeFor(CurrentUser.profileId(jwt), CurrentUser.role(jwt))
-                .map(t -> ResponseEntity.ok(TripResponse.of(t)))
+                .map(t -> ResponseEntity.ok(view(t)))
                 .orElseGet(() -> ResponseEntity.noContent().build());
     }
 
     @GetMapping("/{id}")
     TripResponse get(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        return TripResponse.of(trips.getFor(id, CurrentUser.profileId(jwt), CurrentUser.role(jwt) == Role.ADMIN));
+        return view(trips.getFor(id, CurrentUser.profileId(jwt), CurrentUser.role(jwt) == Role.ADMIN));
     }
 
     /** Last known position of the trip's rider; the live feed (WebSocket /user/topic/location) keeps it fresh after this. */
@@ -64,21 +80,21 @@ class TripController {
 
     @PostMapping("/{id}/cancel")
     TripResponse cancel(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        return TripResponse.of(trips.cancel(id, CurrentUser.profileId(jwt)));
+        return view(trips.cancel(id, CurrentUser.profileId(jwt)));
     }
 
     @PostMapping("/{id}/arrive")
     TripResponse arrive(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        return TripResponse.of(trips.riderArrived(id, CurrentUser.profileId(jwt)));
+        return view(trips.riderArrived(id, CurrentUser.profileId(jwt)));
     }
 
     @PostMapping("/{id}/start")
     TripResponse start(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        return TripResponse.of(trips.start(id, CurrentUser.profileId(jwt)));
+        return view(trips.start(id, CurrentUser.profileId(jwt)));
     }
 
     @PostMapping("/{id}/complete")
     TripResponse complete(@AuthenticationPrincipal Jwt jwt, @PathVariable UUID id) {
-        return TripResponse.of(trips.complete(id, CurrentUser.profileId(jwt)));
+        return view(trips.complete(id, CurrentUser.profileId(jwt)));
     }
 }

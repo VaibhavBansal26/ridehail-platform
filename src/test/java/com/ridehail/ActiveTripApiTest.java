@@ -36,11 +36,17 @@ class ActiveTripApiTest extends ApiTestBase {
         assertThat(mine.get("dropLon").asDouble()).isEqualTo(DROP_LON);
         call(HttpMethod.GET, "/api/trips/active", asha, null).andExpect(status().isNoContent());
 
+        assertThat(mine.get("riderName").isNull()).isTrue();          // nobody is coming yet
+        assertThat(mine.get("paymentStatus").isNull()).isTrue();
+
         // accepted: both parties have it, nobody else does
         String offer = fetch("/api/riders/me/offers", asha).get(0).get("offerId").asText();
         call(HttpMethod.POST, "/api/riders/me/offers/" + offer + "/accept", asha, null);
         assertThat(fetch("/api/trips/active", asha).get("id").asText()).isEqualTo(trip.toString());
-        assertThat(fetch("/api/trips/active", ravi).get("status").asText()).isEqualTo("ACCEPTED");
+        JsonNode accepted = fetch("/api/trips/active", ravi);
+        assertThat(accepted.get("status").asText()).isEqualTo("ACCEPTED");
+        assertThat(accepted.get("riderName").asText()).isEqualTo("Asha");      // who is coming
+        assertThat(accepted.get("riderVehicleType").asText()).isEqualTo("SEDAN");
         call(HttpMethod.GET, "/api/trips/active", stranger, null).andExpect(status().isNoContent());
         call(HttpMethod.GET, "/api/trips/active", other, null).andExpect(status().isNoContent());
 
@@ -51,6 +57,16 @@ class ActiveTripApiTest extends ApiTestBase {
         call(HttpMethod.POST, "/api/trips/" + trip + "/complete", asha, null);
         call(HttpMethod.GET, "/api/trips/active", asha, null).andExpect(status().isNoContent());
         call(HttpMethod.GET, "/api/trips/active", ravi, null).andExpect(status().isNoContent());
+    }
+
+    @Test
+    void aFinishedTripShowsHowItsPaymentStands() throws Exception {
+        Actor ravi = customer("Ravi");
+        Actor asha = onlineRider("Asha", 0.005);
+        Ride ride = completeRide(ravi, asha);
+        org.awaitility.Awaitility.await().atMost(java.time.Duration.ofSeconds(5)).pollInterval(java.time.Duration.ofMillis(50))
+                .until(() -> "CAPTURED".equals(fetch("/api/trips/" + ride.tripId(), ravi).get("paymentStatus").asText()));
+        assertThat(fetch("/api/trips/" + ride.tripId(), asha).get("paymentStatus").asText()).isEqualTo("CAPTURED");
     }
 
     @Test

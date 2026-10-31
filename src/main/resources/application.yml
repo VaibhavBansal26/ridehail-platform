@@ -70,6 +70,8 @@ ridehail:
     connect-country:                                # e.g. US; blank = the platform account's country
     onboarding-return-url: ${STRIPE_ONBOARDING_RETURN_URL:ridehail://payouts/done}
     onboarding-refresh-url: ${STRIPE_ONBOARDING_REFRESH_URL:ridehail://payouts/retry}
+    card-return-url: ${STRIPE_CARD_RETURN_URL:ridehail://card/done}
+    card-cancel-url: ${STRIPE_CARD_CANCEL_URL:ridehail://card/cancelled}
   payments:
     gateway: fake   # fake | stripe
     commission-rate: 0.20

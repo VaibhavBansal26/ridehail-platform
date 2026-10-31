@@ -20,10 +20,18 @@ public interface OnboardingGateway {
     /** Starts saving a card. The client finishes it with {@code clientSecret} in the provider's mobile SDK. */
     CardSetup beginCardSetup(UUID customerId, String existingProviderCustomerId);
 
+    /**
+     * Starts saving a card on the provider's own hosted page: the customer opens {@code url}, enters the card there, and the
+     * saved card reaches us by webhook. For apps that should not embed the provider's SDK.
+     */
+    CardCheckout beginCardCheckout(UUID customerId, String existingProviderCustomerId);
+
     /** Starts (or resumes) payout onboarding; the rider completes it at {@code url}. */
     PayoutOnboarding beginPayoutOnboarding(UUID riderId, String existingProviderAccountId);
 
     record CardSetup(String providerCustomerId, String clientSecret, String publishableKey) {}
+
+    record CardCheckout(String providerCustomerId, String url, Instant expiresAt) {}
 
     record PayoutOnboarding(String providerAccountId, String url, Instant expiresAt) {}
 }

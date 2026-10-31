@@ -7,8 +7,8 @@ Four apps on one shared client, in an npm workspace:
 | `packages/api` | `@ridehail/api`: typed REST client, token refresh, STOMP realtime, zod schemas | **built, tested** |
 | `apps/rider-web` | Next.js rider app | **built, tested** ([below](#rider-web)) |
 | `apps/rider-mobile` | Expo / React Native rider app | **built, tested; not run on a device** ([below](#rider-mobile)) |
-| `apps/customer-web` | Next.js customer app | not started |
-| `apps/customer-mobile` | Expo / React Native customer app | not started |
+| `apps/customer-web` | Next.js customer app | **built, tested** ([below](#customer-apps)) |
+| `apps/customer-mobile` | Expo / React Native customer app | **built, tested; not run on a device** ([below](#customer-apps)) |
 
 ```bash
 cd clients
@@ -114,3 +114,34 @@ npm test                                                                    # Je
   screens driven in a browser through Expo's web build against the real API over HTTP and WebSocket (sign-in, live offer, accept,
   trip panel). **Not verified: running on an iOS simulator, Android emulator or a real phone**, so the keychain, the OS
   permission prompts and background location itself are untested. Do that before relying on them.
+
+## customer apps
+
+`apps/customer-web` (Next.js, port 3002) and `apps/customer-mobile` (Expo): sign in or create an account, choose a pickup and a
+drop-off, see the fare the server works out (valid for two minutes, with a countdown), request the ride, then watch it: finding a
+rider, who is coming and how far away they are (from their live position), the ride, and a receipt with how the payment stands.
+Cancel is offered until the ride starts.
+
+```bash
+cp apps/customer-web/.env.example apps/customer-web/.env.local    # BACKEND_URL, ALLOW_INSECURE_COOKIES=true for plain-http local use
+npm run dev --workspace ridehail-customer-web                      # http://localhost:3002
+cd apps/customer-mobile && EXPO_PUBLIC_API_URL=http://<your computer's address>:8080 npx expo start
+```
+
+- **Cards are saved on Stripe's hosted page**, the same way riders' bank details are: `POST /api/customers/me/payment-method/checkout`
+  returns a Checkout URL, the app opens it (a navigation on the web, the system browser on a phone), and the saved card reaches the
+  server by webhook. No card number is ever typed into our apps and no Stripe SDK is embedded. Set `STRIPE_CARD_RETURN_URL` /
+  `STRIPE_CARD_CANCEL_URL` (see the Stripe setup doc). **Tested against a stub of Stripe, not Stripe itself.**
+- **Development card:** the simulated provider accepts a card token from the client. `DEV_CARD_SHORTCUT=true` +
+  `NEXT_PUBLIC_DEV_CARD=true` (web) or `EXPO_PUBLIC_DEV_CARD=true` (phone) show a "Use a test card" button. The web BFF forwards that one
+  call only when `DEV_CARD_SHORTCUT=true`; a real Stripe-backed server refuses it anyway.
+- **Position:** the customer's position is read once, to set the pickup point. No background location, no tracking of the customer.
+  The rider's live position arrives by push, and the screen never goes back to an older one if messages arrive out of order.
+- **Drop-off is chosen from a list of places** (`src/lib/places.ts`, Bengaluru) because an address search needs a geocoding
+  provider (a key, a bill and a privacy decision) that has not been chosen. Pickup is "use my location" or typed coordinates.
+  **There is no map yet**, for the same reason: tiles and search come from one provider decision.
+- **When a trip ends** the app shows a receipt (paid, being charged, or "update your card" if the charge failed, which links to the
+  card page) or says plainly that a cancelled ride or an unfilled request cost nothing.
+- **Verification:** both customer apps were driven through a whole ride in a browser against the real API (the phone app through
+  Expo's web build): booking, a live push when a rider accepts, live distance, arrival, the ride, and a Captured receipt.
+  The phone app has not been run on a simulator or device (none is set up here).

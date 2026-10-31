@@ -31,6 +31,7 @@ class CustomerPaymentController {
 
     record PaymentMethodRequest(@NotBlank @Size(max = 200) String token) {}
     record CardSetupResponse(String clientSecret, String publishableKey) {}
+    record CardCheckoutResponse(String url, java.time.Instant expiresAt) {}
     record CustomerResponse(UUID id, String name, boolean hasPaymentMethod) {}
 
     @GetMapping
@@ -52,6 +53,20 @@ class CustomerPaymentController {
         var setup = onboarding.beginCardSetup(id, existing); // provider call happens outside any DB transaction
         tx.executeWithoutResult(s -> find(jwt).setProviderCustomerId(setup.providerCustomerId()));
         return new CardSetupResponse(setup.clientSecret(), setup.publishableKey());
+    }
+
+    /**
+     * Saving a card on the provider's own hosted page: open the returned {@code url} (in the system browser; the card is never
+     * typed into our app). The saved card reaches us afterwards via the provider's webhook, and GET /api/customers/me then
+     * reports hasPaymentMethod=true.
+     */
+    @PostMapping("/payment-method/checkout")
+    CardCheckoutResponse beginCardCheckout(@AuthenticationPrincipal Jwt jwt) {
+        UUID id = CurrentUser.profileId(jwt);
+        String existing = tx.execute(s -> find(jwt).getProviderCustomerId());
+        var checkout = onboarding.beginCardCheckout(id, existing); // provider call happens outside any DB transaction
+        tx.executeWithoutResult(s -> find(jwt).setProviderCustomerId(checkout.providerCustomerId()));
+        return new CardCheckoutResponse(checkout.url(), checkout.expiresAt());
     }
 
     /**

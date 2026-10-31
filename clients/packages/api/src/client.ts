@@ -3,6 +3,7 @@ import type { AuthStrategy } from "./auth";
 import { ApiError, ContractError } from "./errors";
 import {
   AuthResult,
+  CardCheckout,
   CardSetup,
   Customer,
   Earnings,
@@ -118,7 +119,12 @@ export function createApi(opts: ApiOptions) {
 
     customer: {
       me: () => get("/api/customers/me", Customer),
-      /** Step 1 of saving a card: the returned client secret goes to the Stripe SDK, which collects the card. */
+      /**
+       * Saving a card on Stripe's hosted page: open the returned `url` in the system browser. The card is never typed into
+       * our app; it reaches the server by webhook, and `me().hasPaymentMethod` turns true.
+       */
+      startCardCheckout: () => post("/api/customers/me/payment-method/checkout", CardCheckout),
+      /** Step 1 of saving a card with the provider's SDK instead: the returned client secret goes to the Stripe SDK, which collects the card. */
       startCardSetup: () => post("/api/customers/me/payment-method/setup", CardSetup),
     },
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { directionsUrl, km, money, secondsUntil, titleCase } from "./format";
+import { directionsUrl, distanceKm, km, money, secondsUntil, titleCase } from "./format";
 
 describe("format", () => {
   it("formats money, falling back for a currency it does not know", () => {
@@ -19,5 +19,13 @@ describe("format", () => {
   it("title-cases statuses and builds a directions link", () => {
     expect(titleCase("AWAITING_FUNDS")).toBe("Awaiting funds");
     expect(directionsUrl(12.9, 77.5)).toContain("destination=12.9,77.5");
+  });
+
+  it("measures the distance between two points", () => {
+    expect(distanceKm({ lat: 12.9716, lon: 77.5946 }, { lat: 12.9716, lon: 77.5946 })).toBe(0);
+    // one degree of latitude is about 111 km
+    expect(distanceKm({ lat: 12, lon: 77 }, { lat: 13, lon: 77 })).toBeCloseTo(111.2, 0);
+    // the Bengaluru pickup/drop pair used throughout the tests is about 5 km apart
+    expect(distanceKm({ lat: 12.9716, lon: 77.5946 }, { lat: 12.9352, lon: 77.6245 })).toBeGreaterThan(4);
   });
 });

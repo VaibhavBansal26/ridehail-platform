@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
-import { AuthResult, CardSetup, Customer, Earnings, Offer, Payout, Quote, Rider, RiderLocation, Trip } from "./schemas";
+import { AuthResult, CardCheckout, CardSetup, Customer, Earnings, Offer, Payout, Quote, Rider, RiderLocation, Trip } from "./schemas";
 
 /**
  * The backend's ClientApiContractTest writes these files from real responses and fails if a response changes shape;
@@ -24,6 +24,7 @@ const cases: [string, z.ZodType][] = [
   ["earnings.json", Earnings],
   ["payout.json", Payout],
   ["card-setup.json", CardSetup],
+  ["card-checkout.json", CardCheckout],
 ];
 
 describe("contract fixtures", () => {

@@ -22,6 +22,7 @@ import com.stripe.param.AccountLinkCreateParams;
 import com.stripe.param.CustomerCreateParams;
 import com.stripe.param.PaymentIntentCreateParams;
 import com.stripe.param.RefundCreateParams;
+import com.stripe.param.checkout.SessionCreateParams;
 import com.stripe.param.SetupIntentCreateParams;
 import com.stripe.param.TransferCreateParams;
 import java.math.BigDecimal;
@@ -183,15 +184,41 @@ public class StripeGateway implements PaymentGateway, OnboardingGateway {
         return false;
     }
 
+    /** The Stripe customer for ours: the one we already know, or a new one (idempotent, so a retry cannot make two). */
+    private String stripeCustomer(UUID customerId, String existingStripeCustomerId) throws StripeException {
+        if (existingStripeCustomerId != null) return existingStripeCustomerId;
+        return stripe.customers().create(CustomerCreateParams.builder()
+                .putMetadata("ridehail_customer_id", customerId.toString())
+                .build(), idempotent("customer-" + customerId)).getId();
+    }
+
+    @Override
+    public CardCheckout beginCardCheckout(UUID customerId, String existingStripeCustomerId) {
+        try {
+            String stripeCustomer = stripeCustomer(customerId, existingStripeCustomerId);
+            // Stripe's hosted page in setup mode: the card is entered there, and the SetupIntent it creates ends in the same
+            // setup_intent.succeeded webhook as the SDK flow, which is what stores the card. Which payment methods the page
+            // offers comes from the Dashboard's payment method settings (leave only cards on, see the setup doc).
+            var session = stripe.checkout().sessions().create(SessionCreateParams.builder()
+                    .setMode(SessionCreateParams.Mode.SETUP)
+                    .setCustomer(stripeCustomer)
+                    .setSuccessUrl(props.cardReturnUrl())
+                    .setCancelUrl(props.cardCancelUrl())
+                    .setSetupIntentData(SessionCreateParams.SetupIntentData.builder()
+                            .putMetadata("ridehail_customer_id", customerId.toString())
+                            .build())
+                    .build());
+            return new CardCheckout(stripeCustomer, session.getUrl(), Instant.ofEpochSecond(session.getExpiresAt()));
+        } catch (StripeException e) {
+            log.warn("Stripe card checkout failed for customer {}: {}", customerId, e.getMessage());
+            throw new BadGatewayException("Could not start card setup, please try again", e);
+        }
+    }
+
     @Override
     public CardSetup beginCardSetup(UUID customerId, String existingStripeCustomerId) {
         try {
-            String stripeCustomer = existingStripeCustomerId;
-            if (stripeCustomer == null) {
-                stripeCustomer = stripe.customers().create(CustomerCreateParams.builder()
-                        .putMetadata("ridehail_customer_id", customerId.toString())
-                        .build(), idempotent("customer-" + customerId)).getId();
-            }
+            String stripeCustomer = stripeCustomer(customerId, existingStripeCustomerId);
             var intent = stripe.setupIntents().create(SetupIntentCreateParams.builder()
                     .setCustomer(stripeCustomer)
                     .setUsage(SetupIntentCreateParams.Usage.OFF_SESSION) // we charge it later, without the customer present

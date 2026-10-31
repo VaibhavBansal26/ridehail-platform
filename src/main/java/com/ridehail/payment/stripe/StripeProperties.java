@@ -12,7 +12,10 @@ public record StripeProperties(
         int maxNetworkRetries,
         String connectCountry,
         String onboardingReturnUrl,
-        String onboardingRefreshUrl) {
+        String onboardingRefreshUrl,
+        /** Where Stripe's hosted card page sends the customer after saving a card, and when they back out. */
+        String cardReturnUrl,
+        String cardCancelUrl) {
 
     /** Every signing secret we accept (account-scope endpoint, Connect-scope endpoint, Stripe CLI...). */
     public java.util.List<String> webhookSecrets() {

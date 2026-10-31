@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 class StripePropertiesTest {
 
     private static StripeProperties props(String apiKey, String webhookSecret, String publishableKey) {
-        return new StripeProperties(apiKey, webhookSecret, publishableKey, null, 0, null, "a", "b");
+        return new StripeProperties(apiKey, webhookSecret, publishableKey, null, 0, null, "a", "b", "c", "d");
     }
 
     @Test

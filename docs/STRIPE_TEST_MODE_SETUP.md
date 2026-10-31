@@ -59,6 +59,8 @@ name below differs slightly, search for the term in italics.
 | `STRIPE_WEBHOOK_SECRET` | `whsec_A,whsec_B` | 1.5 (deployed), or the CLI's secret (section 3). **Comma-separated**, one per endpoint. |
 | `RIDEHAIL_STRIPE_CONNECT_COUNTRY` | `US` | 1.3 |
 | `STRIPE_ONBOARDING_RETURN_URL` | where the rider lands after onboarding | A deep link into your rider app, e.g. `ridehail://payouts/done`. For curl testing any https URL works. |
+| `STRIPE_CARD_RETURN_URL` | where Stripe's hosted card page sends the customer after saving a card | `ridehail://card/done` for the phone app; for the web app an https page of its own, e.g. `https://customer.example.com/account` |
+| `STRIPE_CARD_CANCEL_URL` | where it sends them if they back out | e.g. `ridehail://card/cancelled` or the same web page |
 | `STRIPE_ONBOARDING_REFRESH_URL` | where Stripe sends a rider whose onboarding link expired | e.g. `ridehail://payouts/retry`. The app should call the onboarding endpoint again for a fresh link. |
 | `JWT_SECRET`, `ADMIN_PASSWORD`, `ALLOWED_ORIGINS`, `DB_URL`, `DB_USER`, `DB_PASSWORD` | | Only for the `prod` profile. Not needed for local testing. |
 
@@ -172,6 +174,17 @@ json() { curl -sS -H 'Content-Type: application/json' "$@"; }   # prints the res
   ```
 
   Expect a `clientSecret` like `seti_…_secret_…` and your publishable key. *Dashboard → Customers* now has a new, empty customer.
+- [ ] **C1b. The customer apps use Stripe's hosted page instead of the SDK:**
+
+  ```bash
+  json -X POST $API/api/customers/me/payment-method/checkout -H "$(auth $CT)" | jq .
+  ```
+
+  Expect a `url` on `checkout.stripe.com`. Open it in a browser and pay with the test card `4242 4242 4242 4242` (any future
+  expiry and CVC); the page then redirects to `STRIPE_CARD_RETURN_URL`. In the `stripe listen` terminal expect
+  `setup_intent.succeeded` → `[200]` (Checkout's SetupIntent ends in the same event as the SDK flow), and C4 then shows
+  `"hasPaymentMethod": true`. Which payment methods the page offers comes from the Dashboard's payment method settings:
+  leave only **Cards** on (1.4). This path has been tested against a stub of Stripe, not against Stripe itself.
 - [ ] **C2. A client cannot just claim a card** (it would let someone attach another person's card):
 
   ```bash
