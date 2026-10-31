@@ -1,8 +1,10 @@
 "use client";
 
 import type { Trip } from "@ridehail/api";
+import { RideMap } from "@/components/ride-map";
 import { Button, Card, ErrorNote } from "@/components/ui";
 import { distanceKm, km, money, titleCase } from "@/lib/format";
+import { useHeading } from "@/lib/use-heading";
 import { useCancel, useRiderLocation } from "@/lib/queries";
 
 /** The trip as it stands: finding a rider, who is coming and how far away they are, or the ride itself. */
@@ -10,6 +12,9 @@ export function TripView({ trip }: { trip: Trip }) {
   const cancel = useCancel();
   const tracking = trip.status === "ACCEPTED" || trip.status === "ARRIVED" || trip.status === "IN_PROGRESS";
   const where = useRiderLocation(trip.id, tracking);
+  const position = where.data ? { lat: where.data.lat, lon: where.data.lon } : null;
+  const heading = useHeading(position);
+  const car = position && trip.riderVehicleType ? { ...position, heading, vehicle: trip.riderVehicleType } : null;
   const rider = trip.riderName ?? "Your rider";
 
   let title = "Finding you a rider…";
@@ -31,6 +36,8 @@ export function TripView({ trip }: { trip: Trip }) {
   const canCancel = trip.status === "REQUESTED" || trip.status === "ACCEPTED" || trip.status === "ARRIVED";
 
   return (
+    <>
+    <RideMap pickup={{ lat: trip.pickupLat, lon: trip.pickupLon }} drop={{ lat: trip.dropLat, lon: trip.dropLon }} car={car} label="Map of your ride" />
     <Card>
       <div className="text-xs font-medium tracking-wide text-muted uppercase">
         {titleCase(trip.status)} · {money(trip.fare, trip.currency)}
@@ -50,5 +57,6 @@ export function TripView({ trip }: { trip: Trip }) {
         </Button>
       ) : null}
     </Card>
+    </>
   );
 }

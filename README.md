@@ -4,7 +4,7 @@ A ride-sharing platform: a Spring Boot 3 (Java 21) API, an admin panel for opera
 
 [![Watch the demo](docs/demo/ridehail-demo.gif)](docs/demo/ridehail-demo.mp4)
 
-*The demo (2½ minutes, [mp4](docs/demo/ridehail-demo.mp4)): a customer and a driver sign up, take a ride, and the driver is paid; then the admin panel. It is the real UI against the real API, recorded by [`scripts/demo`](scripts/demo) with simulated payments.*
+*The demo (under 3 minutes, with narration, [mp4](docs/demo/ridehail-demo.mp4)): a customer and a driver take a ride on live maps with the car moving, three requests arrive at the same moment, and the admin panel is toured. It is the real UI against the real API, recorded by [`scripts/demo`](scripts/demo) with simulated payments. The voice in the committed video is a system stand-in; [`scripts/demo`](scripts/demo/README.md) explains how to rebuild it with an ElevenLabs voice.*
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/VaibhavBansal26/ridehail-platform)
 
@@ -14,14 +14,15 @@ A ride-sharing platform: a Spring Boot 3 (Java 21) API, an admin panel for opera
 |---|---|---|
 | **API** | [`src/`](src) | Spring Boot 3, JPA, Flyway on Postgres, JWT roles `CUSTOMER` / `RIDER` / `ADMIN`, STOMP WebSocket |
 | **Admin panel** | [`admin-web/`](admin-web) | Next.js: live map, trips, riders, payments, ledger, disputes, incidents, support, rider verification, audit log ([docs/ADMIN_PANEL.md](docs/ADMIN_PANEL.md)) |
-| **Rider and customer web apps** | [`clients/apps/rider-web`](clients/apps/rider-web), [`customer-web`](clients/apps/customer-web) | Next.js; sign-in cookies are held by the app's server, never by browser JavaScript |
-| **Phone apps** | [`clients/apps/rider-mobile`](clients/apps/rider-mobile), [`customer-mobile`](clients/apps/customer-mobile) | Expo / React Native, tokens in the keychain. **Tested, but not yet run on a device** |
+| **Rider and customer web apps** | [`clients/apps/rider-web`](clients/apps/rider-web), [`customer-web`](clients/apps/customer-web) | Next.js, with maps (Leaflet), vehicle pictures and live car tracking; sign-in cookies are held by the app's server, never by browser JavaScript |
+| **Phone apps** | [`clients/apps/rider-mobile`](clients/apps/rider-mobile), [`customer-mobile`](clients/apps/customer-mobile) | Expo / React Native, tokens in the keychain. **Tested, but not yet run on a device, and without maps yet** (the web apps have them) |
 | **Shared client** | [`clients/packages/api`](clients/packages/api) | Typed REST and realtime client with schema-checked responses ([clients/README.md](clients/README.md)) |
 
 ### What it does
 
 - **Dynamic fares:** upfront quotes with demand and supply surge pricing, locked at booking.
 - **Dispatch:** nearest-rider offers with timeouts; the rider accepts or declines. Live rider location for the customer.
+- **Maps and live tracking (web apps):** the customer sees the pickup, destination and route on a map and watches the driver's vehicle (a bike, auto, sedan or SUV) move live; the driver sees every offer, and the trip, on a map. Several requests at once stack on the driver's screen, each on its own map. Tiles come from OpenStreetMap by default (`MAP_TILE_URL` changes that).
 - **Realtime:** offers, trip updates and rider location over WebSocket. One instance out of the box; many with RabbitMQ and Redis ([docs/SCALING.md](docs/SCALING.md), [docs/LIVE_LOCATION.md](docs/LIVE_LOCATION.md)).
 - **Payments:** the card is charged when a trip ends; a double-entry ledger that must balance (enforced in the database); commission; refunds.
 - **Rider payouts:** riders withdraw their share through Stripe Connect (Accounts v2, Express dashboard). A payout waits for the provider's settled funds rather than failing.
@@ -83,7 +84,7 @@ RIDEHAIL_TEST_PG_URL=jdbc:postgresql://localhost:5432/ridehail mvn test   # 387 
 |---|---|
 | API (`mvn test`) | 387 |
 | Admin panel | 118 |
-| Rider web / customer web | 141 / 109 |
+| Rider web / customer web | 153 / 123 |
 | Rider phone app / customer phone app | 71 / 48 |
 | Shared client | 61 |
 
@@ -103,4 +104,4 @@ RIDEHAIL_TEST_PG_URL=jdbc:postgresql://localhost:5432/ridehail mvn test   # 387 
 
 ## Before real users
 
-Everything under "Known gaps" in the Stripe document. Beyond that, honestly: the phone apps have not run on a device; push needs Expo credentials; there is no map or address-search provider chosen (the apps use a fixed list of destinations); and rider documents and support messages have no retention policy yet.
+Everything under "Known gaps" in the Stripe document. Beyond that, honestly: the phone apps have not run on a device and have no maps yet; push needs Expo credentials; the web maps use OpenStreetMap's public tile server (fine for a demo, against its usage policy at scale) and there is no address search or road routing (destinations are a fixed list and the route is drawn as a straight line); and rider documents and support messages have no retention policy yet.

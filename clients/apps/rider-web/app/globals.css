@@ -62,3 +62,10 @@ body { background: var(--bg); color: var(--text); font-family: var(--font-sans);
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+/* ---- ride maps (components/ride-map-inner.tsx) ---- */
+.leaflet-container { font: inherit; background: var(--surface-2); }
+.ride-pin, .ride-car { background: none; border: 0; }
+/* the marker glides from one reported position to the next instead of jumping: positions arrive every 4 s (see @ridehail/api position.ts) */
+.ride-car { transition: transform 4s linear; }
+.ride-car-art { width: 40px; height: 40px; transform-origin: 50% 50%; transition: transform 0.6s ease; filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.35)); }

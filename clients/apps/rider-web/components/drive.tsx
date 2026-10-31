@@ -4,6 +4,7 @@ import type { Trip } from "@ridehail/api";
 import { useMemo, useState } from "react";
 import { ManualPosition } from "@/components/manual-position";
 import { OfferCard } from "@/components/offer-card";
+import { RideMap } from "@/components/ride-map";
 import { TripPanel } from "@/components/trip-panel";
 import { Button, Card, ErrorNote } from "@/components/ui";
 import { api } from "@/lib/api";
@@ -56,7 +57,7 @@ export function Drive() {
   if (rider.isPending || trip.isPending) return <p className="py-10 text-center text-sm text-muted">Loading…</p>;
   if (rider.isError) return <ErrorNote>{rider.error.message}</ErrorNote>;
 
-  if (activeTrip) return <TripPanel trip={activeTrip} onCompleted={setFinished} />;
+  if (activeTrip) return <TripPanel trip={activeTrip} onCompleted={setFinished} position={tracking.last} vehicle={rider.data?.vehicleType} />;
 
   const pending = offers.data ?? [];
   const problem = tracking.message ?? positionError;
@@ -111,6 +112,8 @@ export function Drive() {
           </Button>
         </Card>
       )}
+
+      {online && tracking.last && rider.data && pending.length === 0 ? <RideMap height="h-48" car={{ ...tracking.last, vehicle: rider.data.vehicleType }} label="Your position" /> : null}
 
       {online
         ? pending.map((offer) => <OfferCard key={offer.offerId} offer={offer} />)

@@ -1,8 +1,10 @@
 "use client";
 
-import type { Trip } from "@ridehail/api";
+import type { Trip, VehicleType } from "@ridehail/api";
 import { Navigation } from "lucide-react";
+import { RideMap } from "@/components/ride-map";
 import { Button, Card, ErrorNote } from "@/components/ui";
+import type { Fix } from "@/lib/position";
 import { directionsUrl, money } from "@/lib/format";
 import { useTripStep } from "@/lib/queries";
 
@@ -13,7 +15,7 @@ const STEP = {
 } as const;
 
 /** The trip the rider is on: where to go next, and the one button that moves it along. */
-export function TripPanel({ trip, onCompleted }: { trip: Trip; onCompleted: (trip: Trip) => void }) {
+export function TripPanel({ trip, onCompleted, position, vehicle }: { trip: Trip; onCompleted: (trip: Trip) => void; position?: Fix | null; vehicle?: VehicleType }) {
   const step = useTripStep();
   const current = STEP[trip.status as keyof typeof STEP];
   if (!current) return null;
@@ -21,6 +23,8 @@ export function TripPanel({ trip, onCompleted }: { trip: Trip; onCompleted: (tri
   const dest = current.target === "pickup" ? { lat: trip.pickupLat, lon: trip.pickupLon } : { lat: trip.dropLat, lon: trip.dropLon };
 
   return (
+    <>
+    <RideMap pickup={{ lat: trip.pickupLat, lon: trip.pickupLon }} drop={{ lat: trip.dropLat, lon: trip.dropLon }} car={position && vehicle ? { ...position, vehicle } : null} label="Map of this trip" />
     <Card>
       <div className="text-xs font-medium tracking-wide text-muted uppercase">Current trip · {money(trip.fare, trip.currency)}</div>
       <h2 className="mt-1 text-xl font-semibold">{current.title}</h2>
@@ -50,5 +54,6 @@ export function TripPanel({ trip, onCompleted }: { trip: Trip; onCompleted: (tri
         {current.button}
       </Button>
     </Card>
+    </>
   );
 }

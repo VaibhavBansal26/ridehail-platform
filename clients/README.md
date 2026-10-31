@@ -17,6 +17,21 @@ npm run typecheck && npm test                                   # package, rider
 RIDEHAIL_E2E_URL=http://localhost:8080 npm test --workspace @ridehail/api   # with the API running: a whole ride
 ```
 
+## Maps and live tracking (the web apps)
+
+`rider-web` and `customer-web` draw maps with Leaflet (`components/ride-map.tsx`, loaded in the browser only). The customer's trip screen shows the
+pickup and destination pins and the driver's vehicle moving: the server pushes the driver's position (`RIDER_LOCATION`, every few seconds), the app keeps
+the latest one, and the marker glides to it (`globals.css`); the direction it points is worked out from the last two positions
+(`lib/use-heading.ts`). The rider's screens show every offer on its own map, and the trip with the driver's own position. The vehicle and pin pictures
+are SVG drawn in code (`components/vehicle-art.tsx`) from presentation attributes only, because the apps' Content-Security-Policy forbids inline `style=`.
+
+- **Tiles:** `MAP_TILE_URL` (default OpenStreetMap's public server, `https://tile.openstreetmap.org/{z}/{x}/{y}.png`) and `MAP_TILE_ATTRIBUTION`, read from the
+  server's environment on every request, so one build serves every deployment. `proxy.ts` allows exactly that tile host in `img-src`. OSM's public server is
+  for light use only: use your own tile provider in production.
+- **The route is a straight line** between pickup and destination, and destinations are a fixed list; real routing and address search need a provider
+  (a key, a bill and a privacy decision) that is not chosen here.
+- **The phone apps have no maps yet.** They would need a native map library and its keys.
+
 ## The shared package
 
 ```ts

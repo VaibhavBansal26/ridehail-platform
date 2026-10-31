@@ -3,7 +3,9 @@
 import type { Quote, VehicleType } from "@ridehail/api";
 import Link from "next/link";
 import { type FormEvent, useEffect, useState } from "react";
+import { RideMap } from "@/components/ride-map";
 import { Button, Card, ErrorNote, Field, inputClass } from "@/components/ui";
+import { VehicleIcon } from "@/components/vehicle-art";
 import { km, money, secondsUntil } from "@/lib/format";
 import { currentPosition, type Fix, parseCoordinates } from "@/lib/position";
 import { PLACES } from "@/lib/places";
@@ -71,9 +73,11 @@ export function Book() {
   }
 
   const noCard = customer.data && !customer.data.hasPaymentMethod;
+  const dropPlace = PLACES.find((p) => p.id === dropId) ?? null;
 
   return (
     <>
+      <RideMap height="h-44" pickup={pickup} drop={dropPlace} label="Map of your pickup and drop-off" />
       <Card title="Where to?">
         <div className="space-y-4">
           <div>
@@ -117,7 +121,8 @@ export function Book() {
             <div className="mb-1 text-sm font-medium">Ride type</div>
             <div role="radiogroup" className="grid grid-cols-4 gap-2">
               {VEHICLES.map(([v, label]) => (
-                <button key={v} role="radio" aria-checked={vehicle === v} onClick={() => setVehicle(v)} className={`min-h-11 rounded-lg border text-sm font-medium ${vehicle === v ? "border-accent text-accent" : "border-line"}`}>
+                <button key={v} role="radio" aria-checked={vehicle === v} onClick={() => setVehicle(v)} className={`flex min-h-11 flex-col items-center gap-0.5 rounded-lg border py-1.5 text-sm font-medium ${vehicle === v ? "border-accent text-accent" : "border-line"}`}>
+                  <VehicleIcon type={v} size={34} />
                   {label}
                 </button>
               ))}

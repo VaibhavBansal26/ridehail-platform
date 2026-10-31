@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { mapSettingsFromEnv, tileOrigin } from "@/lib/map-settings";
 import { ACCESS_COOKIE, PUBLIC_PATHS } from "@/lib/session";
 
 /**
@@ -34,7 +35,8 @@ export function proxy(request: NextRequest) {
     `script-src 'self' 'nonce-${nonce}' 'strict-dynamic'${dev ? " 'unsafe-eval'" : ""}`,
     // the dev server injects <style> tags without a nonce; production serves real stylesheets, so it keeps the strict form
     dev ? "style-src 'self' 'unsafe-inline'" : `style-src 'self' 'nonce-${nonce}'`,
-    "img-src 'self' data: blob:",
+    // map tiles come from the one tile server named in MAP_TILE_URL (OpenStreetMap by default)
+    `img-src 'self' data: blob: ${tileOrigin(mapSettingsFromEnv().tileUrl)}`.trim(),
     "font-src 'self'",
     // the API is only reached through this origin; the WebSocket is the one direct connection (offers and trip pushes)
     `connect-src 'self' ${realtimeOrigin()}`.trim(),
