@@ -54,6 +54,8 @@ cd clients && npm run dev --workspace ridehail-customer-web             # custom
 
 Run the API with demo data (`mvn spring-boot:run -Dspring-boot.run.arguments=--ridehail.demo-data.enabled=true`) to get a populated city; demo accounts are `demo-customer-0` to `-17` and `demo-rider-0` to `-17`, password `demo-password-1`.
 
+**Maps, address search and routes** work out of the box on OpenStreetMap's public servers (internet needed). To use your own or a paid service, set `GEO_SEARCH_URL`, `GEO_ROUTING_URL`, `GEO_API_KEY` and `GEO_USER_AGENT` on the API, and `MAP_TILE_URL` on the web apps (`EXPO_PUBLIC_MAP_TILE_URL` on the phone apps). `GEO_PROVIDER=fake` turns the lookups off, for tests and offline work. Details: [docs/GEO.md](docs/GEO.md).
+
 **Re-recording the demo video:** [`scripts/demo/README.md`](scripts/demo/README.md).
 
 ## Deploy it
