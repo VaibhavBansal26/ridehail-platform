@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import type { z } from "zod";
-import { AuthResult, CardCheckout, Verification, CardSetup, Customer, SupportConversation, Earnings, Offer, Payout, Quote, Rider, RiderLocation, Trip } from "./schemas";
+import { AuthResult, CardCheckout, Place, RoadRoute, Verification, CardSetup, Customer, SupportConversation, Earnings, Offer, Payout, Quote, Rider, RiderLocation, Trip } from "./schemas";
 
 /**
  * The backend's ClientApiContractTest writes these files from real responses and fails if a response changes shape;
@@ -21,6 +21,7 @@ const cases: [string, z.ZodType][] = [
   ["trip-active.json", Trip],
   ["trip-completed.json", Trip],
   ["rider-location.json", RiderLocation],
+  ["route.json", RoadRoute],
   ["earnings.json", Earnings],
   ["payout.json", Payout],
   ["card-setup.json", CardSetup],
@@ -44,8 +45,14 @@ describe("contract fixtures", () => {
     payouts.forEach((p) => expect(Payout.safeParse(p).success).toBe(true));
   });
 
+  it("places.json is a list of places that parse", () => {
+    const places = load("places.json") as unknown[];
+    expect(places.length).toBeGreaterThan(0);
+    places.forEach((p) => expect(Place.safeParse(p).success).toBe(true));
+  });
+
   it("every fixture file is covered by a test above", () => {
-    const covered = new Set([...cases.map(([f]) => f), "offers.json", "payouts.json"]);
+    const covered = new Set([...cases.map(([f]) => f), "offers.json", "payouts.json", "places.json"]);
     expect(readdirSync(DIR).filter((f) => f.endsWith(".json") && !covered.has(f))).toEqual([]);
   });
 });

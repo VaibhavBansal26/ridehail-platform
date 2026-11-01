@@ -102,6 +102,14 @@ export const Trip = z.object({
 });
 export type Trip = z.infer<typeof Trip>;
 
+/** One result of an address search. */
+export const Place = z.object({ name: z.string(), address: z.string(), lat: z.number(), lon: z.number() });
+export type Place = z.infer<typeof Place>;
+
+/** The road between two points: its length and driving time, and its shape as [lat, lon] pairs from start to end. */
+export const RoadRoute = z.object({ distanceKm: z.number(), durationMin: z.number(), points: z.array(z.tuple([z.number(), z.number()])).min(2) });
+export type RoadRoute = z.infer<typeof RoadRoute>;
+
 export const RiderLocation = z.object({
   tripId: z.string(),
   status: TripStatus,

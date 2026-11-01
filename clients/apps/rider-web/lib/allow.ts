@@ -7,6 +7,7 @@ const UUID = "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-
 
 const ALLOWED: [method: string, path: RegExp][] = [
   ["GET", /^riders\/me$/],
+  ["GET", /^routes$/], // the road for an offer or a trip; address search is the customer's
   ["POST", /^riders\/me\/(online|offline)$/],
   ["PUT", /^riders\/me\/location$/],
   ["GET", /^riders\/me\/offers$/],

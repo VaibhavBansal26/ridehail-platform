@@ -17,5 +17,6 @@ export default defineConfig({
     include: ["**/*.test.{ts,tsx}"],
     exclude: ["node_modules", ".next"],
     restoreMocks: true,
+    testTimeout: 15_000, // the first test of a file pays for importing the screen and its libraries, which is slow when the machine is busy
   },
 });

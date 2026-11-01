@@ -7,6 +7,7 @@ const p = (method: string, path: string) => backendPath(method, path.split("/"))
 describe("what the rider app may ask the API for", () => {
   it.each([
     ["GET", "api/riders/me"],
+    ["GET", "api/routes"],
     ["POST", "api/riders/me/online"],
     ["POST", "api/riders/me/offline"],
     ["PUT", "api/riders/me/location"],
@@ -41,6 +42,9 @@ describe("what the rider app may ask the API for", () => {
     ["POST", "api/riders/me/verification/approve"],
     ["GET", `api/admin/verifications/${ID}/documents/SELFIE`],
     ["POST", `api/admin/verifications/${ID}/approve`],
+    // address search is the customer's, and routes are read-only
+    ["GET", "api/places/search"],
+    ["POST", "api/routes"],
     // other roles' endpoints
     // support: the person's own side only, never the staff inbox
     ["GET", "api/admin/support"],

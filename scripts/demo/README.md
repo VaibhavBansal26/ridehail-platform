@@ -5,10 +5,10 @@ the real apps in a real browser. Nothing is mocked. It shows, with a spoken narr
 
 1. A customer and a driver sign up and the customer adds a card (the development test card; the simulated payment gateway is used, so no
    Stripe account or keys are involved).
-2. The customer picks a drop-off on a **map**, sees the upfront fare, and requests a ride. The nearest driver gets the offer in real time
-   with the route on a map and accepts.
-3. The customer watches the **car move live** on the map, from the driver's approach to the drop-off, in the picture of the driver's vehicle.
-   The driver's phone is moved by the script; the app reports its position every few seconds, as a real one does.
+2. The customer **searches for a destination by name** (`DESTINATION`, default "Lalbagh"), sees the **road** to it on a map and the upfront
+   fare, and requests a ride. The nearest driver gets the offer in real time with the road on a map and accepts.
+3. The customer watches the **car move live** on the map, from the driver's approach to the drop-off, in the picture of the driver's vehicle, **along that road**.
+   The driver's phone is moved by the script along the same route the API gave the map; the app reports its position every few seconds, as a real one does.
 4. The card is charged, the driver is credited. Then the **busy case**: three customers request a ride at the same instant, the nearest driver
    sees all three offers at once (each on its own map), takes one, and the others go to drivers nearby, all on the operations map.
 5. A tour of the admin panel: what needs attention, payments, the ledger, a chargeback and its evidence, the audit log.
@@ -37,7 +37,8 @@ You need Node 24, Maven and JDK 21, `ffmpeg`, and [Playwright](https://playwrigh
    (cd clients/apps/customer-web && BACKEND_URL=http://localhost:8080 ALLOW_INSECURE_COOKIES=true DEV_CARD_SHORTCUT=true npx next start --port 3002) &
    ```
 
-   Map tiles come from OpenStreetMap's public server, so the machine needs internet access.
+   Map tiles, address search and road routes come from OpenStreetMap's public services (the API's default provider, see [docs/GEO.md](../../docs/GEO.md)), so the
+   machine needs internet access, and the API must not be started with `GEO_PROVIDER=fake`. If the routing service is down the script drives a straight line.
 
 3. **Narrate, record and assemble, in one command** (about 6 minutes). Restart the API first for tidy demo data:
 
@@ -66,6 +67,8 @@ voice you use; `assemble.cjs` places each line where its scene started.
 - **Two phone-sized browsers side by side.** The apps refuse to be shown in a frame (`frame-ancestors 'none'`), so the customer and the
   driver are recorded as two separate videos and joined with `ffmpeg`'s `hstack`. They start a moment apart, so they can be about
   a second out of step.
+- **The destination is searched, not picked.** The first result for `DESTINATION` is what the customer chooses; a different place name may give a different
+  road and so a different length of video, because the recording waits for the car to arrive.
 - **The car moves because the phone moves.** The script changes the driver's browser geolocation every 4 seconds (the app's reporting
   interval); the server pushes each position to the customer, whose map glides the car from one point to the next.
 - **The busy scene's extra people** (three customers, two nearby drivers) act through the API, the same one the apps use. They are set up

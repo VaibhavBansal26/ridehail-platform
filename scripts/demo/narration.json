@@ -1,19 +1,65 @@
 {
-  "elevenlabs": { "model": "eleven_multilingual_v2", "stability": 0.5, "similarity_boost": 0.75 },
+  "elevenlabs": {
+    "model": "eleven_multilingual_v2",
+    "stability": 0.5,
+    "similarity_boost": 0.75
+  },
   "lines": [
-    { "id": "intro", "text": "Ridehail is a ride-sharing platform: customers, drivers and operations, working together in real time." },
-    { "id": "signup", "text": "A customer signs up in the customer app, while a driver signs up in the rider app." },
-    { "id": "online", "text": "The driver goes online and shares their position. The customer adds a payment card; in this demo, a test card." },
-    { "id": "fare", "text": "The customer picks a drop-off. The map shows the pickup and the destination, and the fare is quoted upfront, with demand-based pricing." },
-    { "id": "offer", "text": "The request goes to the nearest driver, who sees it in real time with the route on a map, and accepts." },
-    { "id": "approach", "text": "Now the customer watches the car approach on the live map, with its position updated every few seconds." },
-    { "id": "drive", "text": "The driver arrives, starts the trip, and the car follows the road to the destination." },
-    { "id": "paid", "text": "When the trip ends, the card is charged automatically, and the driver's earnings are credited through a double-entry ledger." },
-    { "id": "rush", "text": "Now the busy case: three customers request a ride at the very same moment." },
-    { "id": "stack", "text": "The nearest driver sees all three requests at once, each on its own map, and takes one. The others go to drivers nearby." },
-    { "id": "ops", "text": "On the operations map, every request and every driver is visible live." },
-    { "id": "admin", "text": "Operations see what needs attention, every payment, and a ledger that must always balance." },
-    { "id": "disputes", "text": "Chargebacks are tracked and answered from here, and every administrator action is written to an audit log." },
-    { "id": "outro", "text": "Built and tested end to end: a Spring Boot API, web and phone apps, and Stripe payments and payouts." }
+    {
+      "id": "intro",
+      "text": "Ridehail is a ride-sharing platform: customers, drivers and operations, working together in real time."
+    },
+    {
+      "id": "signup",
+      "text": "A customer signs up in the customer app, while a driver signs up in the rider app."
+    },
+    {
+      "id": "online",
+      "text": "The driver goes online and shares their position. The customer adds a payment card; in this demo, a test card."
+    },
+    {
+      "id": "fare",
+      "text": "The customer searches for a destination by name. The map shows the real road to it, and the fare is quoted upfront, with demand-based pricing."
+    },
+    {
+      "id": "offer",
+      "text": "The request goes to the nearest driver, who sees it in real time with the road on a map, and accepts."
+    },
+    {
+      "id": "approach",
+      "text": "Now the customer watches the car approach on the live map, with its position updated every few seconds."
+    },
+    {
+      "id": "drive",
+      "text": "The driver arrives, starts the trip, and the car follows the road to the destination."
+    },
+    {
+      "id": "paid",
+      "text": "When the trip ends, the card is charged automatically, and the driver's earnings are credited through a double-entry ledger."
+    },
+    {
+      "id": "rush",
+      "text": "Now the busy case: three customers request a ride at the very same moment."
+    },
+    {
+      "id": "stack",
+      "text": "The nearest driver sees all three requests at once, each on its own map, and takes one. The others go to drivers nearby."
+    },
+    {
+      "id": "ops",
+      "text": "On the operations map, every request and every driver is visible live."
+    },
+    {
+      "id": "admin",
+      "text": "Operations see what needs attention, every payment, and a ledger that must always balance."
+    },
+    {
+      "id": "disputes",
+      "text": "Chargebacks are tracked and answered from here, and every administrator action is written to an audit log."
+    },
+    {
+      "id": "outro",
+      "text": "Built and tested end to end: a Spring Boot API, web and phone apps, and Stripe payments and payouts."
+    }
   ]
 }

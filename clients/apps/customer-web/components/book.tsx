@@ -8,8 +8,8 @@ import { Button, Card, ErrorNote, Field, inputClass } from "@/components/ui";
 import { VehicleIcon } from "@/components/vehicle-art";
 import { km, money, secondsUntil } from "@/lib/format";
 import { currentPosition, type Fix, parseCoordinates } from "@/lib/position";
-import { PLACES } from "@/lib/places";
-import { useBook, useCustomer, useQuote } from "@/lib/queries";
+import { PLACES, type Place } from "@/lib/places";
+import { useBook, useCustomer, usePlaceSearch, useQuote, useRoad } from "@/lib/queries";
 
 const VEHICLES: [VehicleType, string][] = [
   ["BIKE", "Bike"],
@@ -37,7 +37,9 @@ export function Book() {
   const [pickup, setPickup] = useState<Fix | null>(null);
   const [pickupError, setPickupError] = useState<string | null>(null);
   const [locating, setLocating] = useState(false);
-  const [dropId, setDropId] = useState(PLACES[0]!.id);
+  const [dest, setDest] = useState<Pick<Place, "name" | "lat" | "lon">>(PLACES[0]!);
+  const [term, setTerm] = useState("");
+  const search = usePlaceSearch();
   const [vehicle, setVehicle] = useState<VehicleType>("SEDAN");
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -64,20 +66,25 @@ export function Book() {
     setPickup(fix);
   }
 
+  function runSearch(e?: FormEvent) {
+    e?.preventDefault();
+    const q = term.trim();
+    if (q.length >= 3) search.mutate({ q, near: pickup ?? undefined });
+  }
+
   function getFare() {
     setFormError(null);
-    const drop = PLACES.find((p) => p.id === dropId);
     if (!pickup) return setFormError("Set your pickup point first.");
-    if (!drop) return setFormError("Choose where you are going.");
-    quote.mutate({ vehicleType: vehicle, pickupLat: pickup.lat, pickupLon: pickup.lon, dropLat: drop.lat, dropLon: drop.lon });
+    quote.mutate({ vehicleType: vehicle, pickupLat: pickup.lat, pickupLon: pickup.lon, dropLat: dest.lat, dropLon: dest.lon });
   }
 
   const noCard = customer.data && !customer.data.hasPaymentMethod;
-  const dropPlace = PLACES.find((p) => p.id === dropId) ?? null;
+  const road = useRoad(pickup, dest);
+  const popular = PLACES.find((p) => p.lat === dest.lat && p.lon === dest.lon);
 
   return (
     <>
-      <RideMap height="h-44" pickup={pickup} drop={dropPlace} label="Map of your pickup and drop-off" />
+      <RideMap height="h-44" pickup={pickup} drop={dest} route={road.data} label="Map of your pickup and drop-off" />
       <Card title="Where to?">
         <div className="space-y-4">
           <div>
@@ -109,8 +116,36 @@ export function Book() {
             ) : null}
           </div>
 
+          <form onSubmit={runSearch} role="search" className="space-y-2">
+            <Field label="Search for an address or place">
+              <div className="flex gap-2">
+                <input type="search" value={term} onChange={(e) => setTerm(e.target.value)} placeholder="e.g. Cubbon Park" autoComplete="off" className={inputClass} />
+                <Button type="submit" variant="secondary" busy={search.isPending} disabled={term.trim().length < 3}>Search</Button>
+              </div>
+            </Field>
+            {search.error ? <ErrorNote>Search isn&apos;t available right now. Choose from the popular places below.</ErrorNote> : null}
+            {search.data && search.data.length === 0 ? <p className="text-sm text-muted">Nothing found. Try another name, or choose a popular place.</p> : null}
+            {search.data && search.data.length > 0 ? (
+              <ul aria-label="Search results" className="divide-y divide-line overflow-hidden rounded-lg border border-line">
+                {search.data.map((p, i) => (
+                  <li key={`${p.lat},${p.lon},${i}`}>
+                    <button type="button" onClick={() => { setDest(p); search.reset(); }} className="block min-h-11 w-full px-3 py-2 text-left hover:bg-surface-2">
+                      <span className="block text-sm font-medium">{p.name}</span>
+                      <span className="block truncate text-xs text-muted">{p.address}</span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </form>
+
           <Field label="Drop-off">
-            <select value={dropId} onChange={(e) => setDropId(e.target.value)} className={inputClass}>
+            <select
+              value={popular ? popular.id : "chosen"}
+              onChange={(e) => { const p = PLACES.find((x) => x.id === e.target.value); if (p) setDest(p); }}
+              className={inputClass}
+            >
+              {popular ? null : <option value="chosen">{dest.name}</option>}
               {PLACES.map((p) => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}

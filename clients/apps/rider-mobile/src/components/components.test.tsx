@@ -9,6 +9,7 @@ jest.mock("@/lib/api", () => ({
   api: {
     rider: { acceptOffer: jest.fn(), declineOffer: jest.fn(), me: jest.fn(), offers: jest.fn() },
     trips: { arrive: jest.fn(), start: jest.fn(), complete: jest.fn(), active: jest.fn() },
+    routes: { between: jest.fn() },
   },
 }));
 const rider = api.rider as jest.Mocked<typeof api.rider>;
@@ -96,5 +97,36 @@ describe("TripPanel", () => {
     await renderApp(<TripPanel trip={trip} onCompleted={jest.fn()} />);
     await fireEvent.press(await screen.findByRole("button", { name: "I've arrived" }));
     expect(await screen.findByText("Trip was cancelled")).toBeTruthy();
+  });
+});
+
+describe("maps on the rider's screens", () => {
+  const webview = jest.requireMock("react-native-webview") as { __injected: string[]; __props: { current: Record<string, (...a: unknown[]) => unknown> } };
+  const ready = () => act(async () => webview.__props.current.onMessage!({ nativeEvent: { data: "ready" } }));
+  const lastState = () => webview.__injected[webview.__injected.length - 1] ?? "";
+
+  beforeEach(() => {
+    webview.__injected.length = 0;
+    (api as unknown as { routes: { between: jest.Mock } }).routes.between.mockResolvedValue({ distanceKm: 5, durationMin: 12, points: [[1, 2], [2, 3], [3, 4]] });
+  });
+
+  it("shows an offer on its own map, with the pickup, the drop-off and the road", async () => {
+    await renderApp(<OfferCard offer={offer(15)} />);
+    await ready();
+    await waitFor(() => expect(lastState()).toContain('"route":[[1,2],[2,3],[3,4]]'));
+    expect(lastState()).toContain('"pickup":{"lat":1,"lon":2}');
+    expect(lastState()).toContain('"drop":{"lat":3,"lon":4}');
+  });
+
+  it("shows the trip map without a vehicle until the driver's position is known", async () => {
+    await renderApp(<TripPanel trip={trip} onCompleted={() => {}} position={null} vehicle="SEDAN" />);
+    await ready();
+    expect(lastState()).toContain('"car":null');
+  });
+
+  it("puts the driver's own vehicle on the trip map once a position is known", async () => {
+    await renderApp(<TripPanel trip={trip} onCompleted={() => {}} position={{ lat: 12.971, lon: 77.591, heading: 45 }} vehicle="SEDAN" />);
+    await ready();
+    expect(lastState()).toContain('"car":{"lat":12.971,"lon":77.591,"heading":45,"vehicle":"SEDAN"}');
   });
 });

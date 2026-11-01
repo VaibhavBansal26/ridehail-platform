@@ -36,3 +36,17 @@ jest.mock("expo-image-picker", () => ({
   launchImageLibraryAsync: jest.fn(),
   CameraType: { front: "front", back: "back" },
 }));
+
+// A WebView cannot run in a test: stand in for it with a plain view, and record what the map was told (see ride-map.test.tsx).
+jest.mock("react-native-webview", () => {
+  const React = require("react");
+  const { View } = require("react-native");
+  const injected: string[] = [];
+  const lastProps: { current: Record<string, unknown> | null } = { current: null };
+  const WebView = React.forwardRef((props: Record<string, unknown>, ref: unknown) => {
+    React.useImperativeHandle(ref, () => ({ injectJavaScript: (script: string) => injected.push(script) }));
+    lastProps.current = props;
+    return React.createElement(View, { testID: "webview" });
+  });
+  return { WebView, __injected: injected, __props: lastProps };
+});

@@ -64,9 +64,10 @@ export function useLocationReporter(opts: {
   source: PositionSource;
   send: (fix: Fix) => Promise<unknown>;
   intervalMs?: number;
-}): { state: TrackingState; message: string | null } {
+}): { state: TrackingState; message: string | null; last: Fix | null } {
   const { enabled, source, intervalMs } = opts;
   const [status, setStatus] = useState<{ state: TrackingState; message: string | null }>({ state: "idle", message: null });
+  const [last, setLast] = useState<Fix | null>(null);
   const send = useRef(opts.send);
   useEffect(() => {
     send.current = opts.send;
@@ -78,9 +79,10 @@ export function useLocationReporter(opts: {
       source,
       intervalMs,
       send: (fix) => send.current(fix),
+      onFix: setLast,
       onState: (state, message) => setStatus({ state, message }),
     });
   }, [enabled, source, intervalMs]);
 
-  return status;
+  return { ...status, last };
 }

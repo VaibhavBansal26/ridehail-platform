@@ -59,6 +59,10 @@ class ClientApiContractTest extends ApiTestBase {
         call(HttpMethod.PUT, "/api/riders/me/location", rider, "{\"lat\":12.9720,\"lon\":77.5950,\"heading\":90}");
         check("rider-location.json", fetch("/api/trips/" + trip + "/rider-location", customer));
 
+        // address search and the road between two points (the simulated provider: no network in tests)
+        check("places.json", fetch("/api/places/search?q=indira", customer));
+        check("route.json", fetch("/api/routes?fromLat=" + PICKUP_LAT + "&fromLon=" + PICKUP_LON + "&toLat=" + DROP_LAT + "&toLon=" + DROP_LON, customer));
+
         call(HttpMethod.POST, "/api/trips/" + trip + "/arrive", rider, null);
         call(HttpMethod.POST, "/api/trips/" + trip + "/start", rider, null);
         JsonNode completed = body(call(HttpMethod.POST, "/api/trips/" + trip + "/complete", rider, null));

@@ -33,6 +33,11 @@ x-app-prod-env: &app-prod-env
   DOCUMENT_ENCRYPTION_KEY: ${DOCUMENT_ENCRYPTION_KEY:?set DOCUMENT_ENCRYPTION_KEY (base64 of 32 random bytes)}
   RIDER_VERIFICATION_REQUIRED: ${RIDER_VERIFICATION_REQUIRED:-true}
   PUSH_PROVIDER: ${PUSH_PROVIDER:-expo}
+  GEO_SEARCH_URL: ${GEO_SEARCH_URL:-https://nominatim.openstreetmap.org}
+  GEO_ROUTING_URL: ${GEO_ROUTING_URL:-https://router.project-osrm.org}
+  GEO_USER_AGENT: ${GEO_USER_AGENT:-ridehail-platform (set GEO_USER_AGENT to your application name and a contact address)}
+  GEO_API_KEY: ${GEO_API_KEY:-}
+  GEO_FARES_USE_ROADS: ${GEO_FARES_USE_ROADS:-false}
   EXPO_ACCESS_TOKEN: ${EXPO_ACCESS_TOKEN:-}
   MANAGEMENT_PORT: "9090"
 

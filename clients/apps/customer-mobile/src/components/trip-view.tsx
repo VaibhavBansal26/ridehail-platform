@@ -1,7 +1,9 @@
 import { distanceKm, km, money, titleCase, type Trip } from "@ridehail/api";
 import { Text } from "react-native";
+import { RideMap } from "@/components/ride-map";
 import { Button, Card, ErrorNote, Muted, useTheme } from "@/components/ui";
-import { useCancel, useRiderLocation } from "@/lib/queries";
+import { useHeading } from "@/lib/use-heading";
+import { useCancel, useRiderLocation, useRoad } from "@/lib/queries";
 
 /** The trip as it stands: finding a rider, who is coming and how far away they are, or the ride itself. */
 export function TripView({ trip }: { trip: Trip }) {
@@ -10,6 +12,10 @@ export function TripView({ trip }: { trip: Trip }) {
   const tracking = trip.status === "ACCEPTED" || trip.status === "ARRIVED" || trip.status === "IN_PROGRESS";
   const where = useRiderLocation(trip.id, tracking);
   const rider = trip.riderName ?? "Your rider";
+  const position = where.data ? { lat: where.data.lat, lon: where.data.lon } : null;
+  const heading = useHeading(position);
+  const car = position && trip.riderVehicleType ? { ...position, heading, vehicle: trip.riderVehicleType } : null;
+  const road = useRoad({ lat: trip.pickupLat, lon: trip.pickupLon }, { lat: trip.dropLat, lon: trip.dropLon });
 
   let title = "Finding you a rider…";
   let detail = "We are asking the nearest riders. This usually takes under a minute.";
@@ -30,6 +36,8 @@ export function TripView({ trip }: { trip: Trip }) {
   const canCancel = trip.status === "REQUESTED" || trip.status === "ACCEPTED" || trip.status === "ARRIVED";
 
   return (
+    <>
+    <RideMap pickup={{ lat: trip.pickupLat, lon: trip.pickupLon }} drop={{ lat: trip.dropLat, lon: trip.dropLon }} car={car} route={road.data} label="Map of your ride" />
     <Card>
       <Muted>{`${titleCase(trip.status).toUpperCase()} · ${money(trip.fare, trip.currency)}`}</Muted>
       <Text accessibilityRole="header" style={{ color: t.text, fontSize: 22, fontWeight: "700" }}>{title}</Text>
@@ -38,5 +46,6 @@ export function TripView({ trip }: { trip: Trip }) {
       {cancel.error ? <ErrorNote>{cancel.error.message}</ErrorNote> : null}
       {canCancel ? <Button label="Cancel ride" variant="secondary" busy={cancel.isPending} onPress={() => cancel.mutate(trip.id)} /> : null}
     </Card>
+    </>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { DocumentType } from "@ridehail/api";
+import type { DocumentType, LatLon } from "@ridehail/api";
 import { api } from "@/lib/api";
 
 export const keys = {
@@ -88,4 +88,17 @@ export function useSendSupport() {
 export function useMarkSupportRead() {
   const qc = useQueryClient();
   return useMutation({ mutationFn: api.support.markRead, onSuccess: () => qc.invalidateQueries({ queryKey: ["support"] }) });
+}
+
+/** The road between two points, for drawing. Nothing while it loads or if the routing service is down: the map then draws a straight line. */
+export function useRoad(from: LatLon | null | undefined, to: LatLon | null | undefined) {
+  const r = (n: number) => Math.round(n * 1e4) / 1e4; // about 11 m: nearby requests share one answer
+  return useQuery({
+    queryKey: ["road", from && r(from.lat), from && r(from.lon), to && r(to.lat), to && r(to.lon)],
+    queryFn: () => api.routes.between(from!, to!),
+    enabled: !!from && !!to,
+    staleTime: 30 * 60_000,
+    retry: false,
+    select: (route) => route.points,
+  });
 }

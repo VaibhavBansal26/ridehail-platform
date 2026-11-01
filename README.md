@@ -14,15 +14,15 @@ A ride-sharing platform: a Spring Boot 3 (Java 21) API, an admin panel for opera
 |---|---|---|
 | **API** | [`src/`](src) | Spring Boot 3, JPA, Flyway on Postgres, JWT roles `CUSTOMER` / `RIDER` / `ADMIN`, STOMP WebSocket |
 | **Admin panel** | [`admin-web/`](admin-web) | Next.js: live map, trips, riders, payments, ledger, disputes, incidents, support, rider verification, audit log ([docs/ADMIN_PANEL.md](docs/ADMIN_PANEL.md)) |
-| **Rider and customer web apps** | [`clients/apps/rider-web`](clients/apps/rider-web), [`customer-web`](clients/apps/customer-web) | Next.js, with maps (Leaflet), vehicle pictures and live car tracking; sign-in cookies are held by the app's server, never by browser JavaScript |
-| **Phone apps** | [`clients/apps/rider-mobile`](clients/apps/rider-mobile), [`customer-mobile`](clients/apps/customer-mobile) | Expo / React Native, tokens in the keychain. **Tested, but not yet run on a device, and without maps yet** (the web apps have them) |
+| **Rider and customer web apps** | [`clients/apps/rider-web`](clients/apps/rider-web), [`customer-web`](clients/apps/customer-web) | Next.js, with maps (Leaflet), road routes, address search, vehicle pictures and live car tracking; sign-in cookies are held by the app's server, never by browser JavaScript |
+| **Phone apps** | [`clients/apps/rider-mobile`](clients/apps/rider-mobile), [`customer-mobile`](clients/apps/customer-mobile) | Expo / React Native, tokens in the keychain, with the same maps, routes, address search and vehicle pictures (the map is a Leaflet page in a WebView: no native map library or key). **Tested and bundled, but not yet run on a device** |
 | **Shared client** | [`clients/packages/api`](clients/packages/api) | Typed REST and realtime client with schema-checked responses ([clients/README.md](clients/README.md)) |
 
 ### What it does
 
 - **Dynamic fares:** upfront quotes with demand and supply surge pricing, locked at booking.
 - **Dispatch:** nearest-rider offers with timeouts; the rider accepts or declines. Live rider location for the customer.
-- **Maps and live tracking (web apps):** the customer sees the pickup, destination and route on a map and watches the driver's vehicle (a bike, auto, sedan or SUV) move live; the driver sees every offer, and the trip, on a map. Several requests at once stack on the driver's screen, each on its own map. Tiles come from OpenStreetMap by default (`MAP_TILE_URL` changes that).
+- **Maps, routes and live tracking:** the customer searches for a destination by name, sees the pickup, destination and the **road** between them on a map, and watches the driver's vehicle (a bike, auto, sedan or SUV) move live; the driver sees every offer, and the trip, on a map. Several requests at once stack on the driver's screen, each on its own map. The admin map shows every driver as their vehicle. Search and routes go through the API ([docs/GEO.md](docs/GEO.md)); tiles come from OpenStreetMap by default (`MAP_TILE_URL` changes that).
 - **Realtime:** offers, trip updates and rider location over WebSocket. One instance out of the box; many with RabbitMQ and Redis ([docs/SCALING.md](docs/SCALING.md), [docs/LIVE_LOCATION.md](docs/LIVE_LOCATION.md)).
 - **Payments:** the card is charged when a trip ends; a double-entry ledger that must balance (enforced in the database); commission; refunds.
 - **Rider payouts:** riders withdraw their share through Stripe Connect (Accounts v2, Express dashboard). A payout waits for the provider's settled funds rather than failing.
@@ -39,7 +39,7 @@ You need JDK 21 and Maven; Node 24 for the web apps; Docker for the compose stac
 
 ```bash
 mvn spring-boot:run      # the API on :8080: in-memory H2, simulated payments, dev-only secrets
-mvn test                 # 387 tests (H2; plus tests against a real Redis, RabbitMQ and Postgres when Docker is available)
+mvn test                 # 403 tests run (H2; plus tests against a real Redis, RabbitMQ and Postgres when Docker is available)
 docker compose up --build   # TWO API instances + Postgres, RabbitMQ, Redis, an nginx gateway on http://localhost:8080 and the admin panel on http://localhost:3000
 DEMO_DATA=true docker compose up --build   # the same, with a demo city loaded so the panel has something to show
 ```
@@ -75,18 +75,18 @@ The same integration tests run against a real Postgres (migrations, schema valid
 
 ```bash
 docker run -d --name pg -e POSTGRES_DB=ridehail -e POSTGRES_USER=ridehail -e POSTGRES_PASSWORD=ridehail -p 5432:5432 postgres:16-alpine
-RIDEHAIL_TEST_PG_URL=jdbc:postgresql://localhost:5432/ridehail mvn test   # 387 tests, none skipped
+RIDEHAIL_TEST_PG_URL=jdbc:postgresql://localhost:5432/ridehail mvn test   # the Postgres-only tests run too
 ```
 
 ## Tests and CI
 
 | Suite | Tests |
 |---|---|
-| API (`mvn test`) | 387 |
-| Admin panel | 118 |
-| Rider web / customer web | 153 / 123 |
-| Rider phone app / customer phone app | 71 / 48 |
-| Shared client | 61 |
+| API (`mvn test`) | 403 run (76 more are skipped unless Docker or Postgres is available) |
+| Admin panel | 124 |
+| Rider web / customer web | 149 / 127 |
+| Rider phone app / customer phone app | 79 / 59 |
+| Shared client | 80 |
 
 [CI](.github/workflows/ci.yml) runs the API tests on H2 and on a Postgres service container; checks the admin panel and the web apps (lint, types, tests, production build); bundles both phone apps for iOS and Android; runs a whole ride through the shared client against the running API; builds every Docker image; and brings up the two-instance compose stack to check that realtime and rate limits work across instances (`scripts/verify-realtime.py`). The API's `ClientApiContractTest` fails if a response stops matching the fixtures the clients parse.
 
@@ -99,9 +99,10 @@ RIDEHAIL_TEST_PG_URL=jdbc:postgresql://localhost:5432/ridehail mvn test   # 387 
 | [docs/ADMIN_PANEL.md](docs/ADMIN_PANEL.md) | What the admin panel shows and how it is secured |
 | [docs/DISPUTES.md](docs/DISPUTES.md) | Chargebacks, evidence and finance incidents |
 | [docs/SCALING.md](docs/SCALING.md) | Running more than one API instance |
+| [docs/GEO.md](docs/GEO.md) | Address search and road routes: the endpoints, providers, limits and caching |
 | [docs/LIVE_LOCATION.md](docs/LIVE_LOCATION.md) | How live rider location works |
 | [clients/README.md](clients/README.md) | The shared client, the contract fixtures, and each app |
 
 ## Before real users
 
-Everything under "Known gaps" in the Stripe document. Beyond that, honestly: the phone apps have not run on a device and have no maps yet; push needs Expo credentials; the web maps use OpenStreetMap's public tile server (fine for a demo, against its usage policy at scale) and there is no address search or road routing (destinations are a fixed list and the route is drawn as a straight line); and rider documents and support messages have no retention policy yet.
+Everything under "Known gaps" in the Stripe document. Beyond that, honestly: the phone apps have not run on a device; push needs Expo credentials; the maps, address search and road routes use OpenStreetMap's **public** servers by default (fine for a demo, against their usage policies at scale: see [docs/GEO.md](docs/GEO.md)); the phone maps load Leaflet from a CDN and need the network; and rider documents and support messages have no retention policy yet.

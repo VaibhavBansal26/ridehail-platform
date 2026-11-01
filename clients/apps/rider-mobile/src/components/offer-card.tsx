@@ -1,8 +1,9 @@
 import { km, money, type Offer, secondsUntil } from "@ridehail/api";
 import { useEffect, useState } from "react";
 import { Text, View } from "react-native";
+import { RideMap } from "@/components/ride-map";
 import { Button, Card, ErrorNote, Muted, useTheme } from "@/components/ui";
-import { useOfferAnswer } from "@/lib/queries";
+import { useOfferAnswer, useRoad } from "@/lib/queries";
 
 /** Seconds left on an offer, ticking each second; 0 means it has expired and will be withdrawn by the server. */
 export function useSecondsLeft(expiresAt: string, tick = 1000): number {
@@ -18,6 +19,7 @@ export function OfferCard({ offer }: { offer: Offer }) {
   const t = useTheme();
   const left = useSecondsLeft(offer.expiresAt);
   const answer = useOfferAnswer();
+  const road = useRoad({ lat: offer.pickupLat, lon: offer.pickupLon }, { lat: offer.dropLat, lon: offer.dropLon });
   if (left === 0) return null; // the server expires it too; hiding it now avoids a tap that can only fail
 
   return (
@@ -33,6 +35,7 @@ export function OfferCard({ offer }: { offer: Offer }) {
           <Text style={{ color: t.warnFg, fontWeight: "700" }}>{left}s</Text>
         </View>
       </View>
+      <RideMap height={120} pickup={{ lat: offer.pickupLat, lon: offer.pickupLon }} drop={{ lat: offer.dropLat, lon: offer.dropLon }} route={road.data} label="Map of this trip request" />
       {answer.error ? <ErrorNote>{answer.error.message}</ErrorNote> : null}
       <View style={{ flexDirection: "row", gap: 8 }}>
         <View style={{ flex: 1 }}>

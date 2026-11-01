@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Text } from "react-native";
 import { ManualPosition } from "@/components/manual-position";
 import { OfferCard } from "@/components/offer-card";
+import { RideMap } from "@/components/ride-map";
 import { TripPanel } from "@/components/trip-panel";
 import { Button, Card, ErrorNote, Muted, useTheme } from "@/components/ui";
 import { api } from "@/lib/api";
@@ -65,7 +66,7 @@ export function Drive() {
 
   if (rider.isPending || trip.isPending) return <Muted style={{ textAlign: "center", paddingVertical: 40 }}>Loading…</Muted>;
   if (rider.isError) return <ErrorNote>{rider.error.message}</ErrorNote>;
-  if (activeTrip) return <TripPanel trip={activeTrip} onCompleted={setFinished} />;
+  if (activeTrip) return <TripPanel trip={activeTrip} onCompleted={setFinished} position={tracking.last} vehicle={rider.data?.vehicleType} />;
 
   const problem = tracking.message ?? positionError;
   const lostPosition = online && (tracking.state === "denied" || tracking.state === "unavailable");
@@ -107,6 +108,8 @@ export function Drive() {
           <Button label="Go offline" variant="secondary" busy={goOffline.isPending} onPress={() => goOffline.mutate()} />
         </Card>
       )}
+
+      {online && tracking.last && rider.data && (offers.data ?? []).length === 0 ? <RideMap height={170} car={{ ...tracking.last, vehicle: rider.data.vehicleType }} label="Your position" /> : null}
 
       {online ? (offers.data ?? []).map((offer) => <OfferCard key={offer.offerId} offer={offer} />) : null}
 

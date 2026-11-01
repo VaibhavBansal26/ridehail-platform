@@ -2,6 +2,8 @@ export * from "./auth";
 export * from "./client";
 export * from "./errors";
 export * from "./format";
+export * from "./map";
+export * from "./map-page";
 export * from "./position";
 export * from "./realtime";
 export * from "./schemas";

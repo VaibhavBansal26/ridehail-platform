@@ -55,6 +55,8 @@ services:
         value: simple           # one instance: no RabbitMQ needed
       - key: RATELIMIT_STORE
         value: memory           # one instance: no Redis needed
+      - key: GEO_USER_AGENT
+        value: ridehail-demo (set this to your own name and a contact address)   # the public Nominatim requires an identifying agent
       - key: PUSH_PROVIDER
         value: none             # no phone-app notifications from a demo
       - key: RIDER_VERIFICATION_REQUIRED

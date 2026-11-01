@@ -9,6 +9,8 @@ describe("what the customer app may ask the API for", () => {
     ["GET", "api/customers/me"],
     ["POST", "api/customers/me/payment-method/checkout"],
     ["POST", "api/fares/quote"],
+    ["GET", "api/places/search"],
+    ["GET", "api/routes"],
     ["POST", "api/trips"],
     ["GET", "api/support"],
     ["POST", "api/support/messages"],
@@ -46,6 +48,9 @@ describe("what the customer app may ask the API for", () => {
     // the card shortcut is a development convenience, off unless this deployment says so
     ["PUT", "api/customers/me/payment-method"],
     ["POST", "api/customers/me/payment-method/setup"],
+    ["POST", "api/places/search"],
+    ["DELETE", "api/routes"],
+    ["GET", "api/places"],
     // right path, wrong method
     ["GET", "api/fares/quote"],
     ["POST", "api/customers/me"],

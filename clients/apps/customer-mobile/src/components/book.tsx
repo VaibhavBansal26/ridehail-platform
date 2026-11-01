@@ -2,11 +2,12 @@ import { km, money, type Quote, secondsUntil, type VehicleType } from "@ridehail
 import { Link } from "expo-router";
 import { useEffect, useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import { RideMap } from "@/components/ride-map";
 import { Button, Card, ErrorNote, Field, Muted, useTheme } from "@/components/ui";
 import { registerForPush } from "@/lib/push";
-import { PLACES } from "@/lib/places";
+import { PLACES, type Place } from "@/lib/places";
 import { currentPosition, type Fix, parseCoordinates } from "@/lib/position";
-import { useBook, useCustomer, useQuote } from "@/lib/queries";
+import { useBook, useCustomer, usePlaceSearch, useQuote, useRoad } from "@/lib/queries";
 
 const VEHICLES: [VehicleType, string][] = [
   ["BIKE", "Bike"],
@@ -46,14 +47,17 @@ export function Book() {
   const [locating, setLocating] = useState(false);
   const [lat, setLat] = useState("12.9716");
   const [lon, setLon] = useState("77.5946");
-  const [dropId, setDropId] = useState(PLACES[0]!.id);
+  const [dest, setDest] = useState<Pick<Place, "name" | "lat" | "lon">>(PLACES[0]!);
+  const [term, setTerm] = useState("");
+  const search = usePlaceSearch();
   const [vehicle, setVehicle] = useState<VehicleType>("SEDAN");
   const [formError, setFormError] = useState<string | null>(null);
 
+  const road = useRoad(pickup, dest);
   const left = useSecondsLeft(quote.data?.expiresAt);
   const live: Quote | null = quote.data && left > 0 ? quote.data : null;
 
-  async function useMyLocation() {
+  async function locateMe() {
     setLocating(true);
     setPickupError(null);
     try {
@@ -71,18 +75,22 @@ export function Book() {
     setPickup(fix);
   }
 
+  function runSearch() {
+    const q = term.trim();
+    if (q.length >= 3) search.mutate({ q, near: pickup ?? undefined });
+  }
+
   function getFare() {
     setFormError(null);
-    const drop = PLACES.find((p) => p.id === dropId);
     if (!pickup) return setFormError("Set your pickup point first.");
-    if (!drop) return setFormError("Choose where you are going.");
-    quote.mutate({ vehicleType: vehicle, pickupLat: pickup.lat, pickupLon: pickup.lon, dropLat: drop.lat, dropLon: drop.lon });
+    quote.mutate({ vehicleType: vehicle, pickupLat: pickup.lat, pickupLon: pickup.lon, dropLat: dest.lat, dropLon: dest.lon });
   }
 
   const noCard = customer.data && !customer.data.hasPaymentMethod;
 
   return (
     <>
+      <RideMap height={190} pickup={pickup} drop={dest} route={road.data} label="Map of your pickup and drop-off" />
       <Card title="Where to?">
         <Text style={{ color: t.text, fontWeight: "600" }}>Pickup</Text>
         {pickup ? (
@@ -94,7 +102,7 @@ export function Book() {
           </Text>
         ) : (
           <>
-            <Button label="Use my location" variant="secondary" busy={locating} onPress={() => void useMyLocation()} />
+            <Button label="Use my location" variant="secondary" busy={locating} onPress={() => void locateMe()} />
             {pickupError ? <ErrorNote>{pickupError}</ErrorNote> : null}
             <Muted>Or enter your pickup point:</Muted>
             <View style={{ flexDirection: "row", gap: 8 }}>
@@ -106,9 +114,25 @@ export function Book() {
         )}
 
         <Text style={{ color: t.text, fontWeight: "600" }}>Drop-off</Text>
+        <Field label="Search for an address or place" value={term} onChangeText={setTerm} placeholder="e.g. Cubbon Park" returnKeyType="search" onSubmitEditing={runSearch} autoCorrect={false} />
+        <Button label="Search" variant="secondary" busy={search.isPending} disabled={term.trim().length < 3} onPress={runSearch} />
+        {search.error ? <ErrorNote>Search isn&apos;t available right now. Choose from the popular places below.</ErrorNote> : null}
+        {search.data && search.data.length === 0 ? <Muted>Nothing found. Try another name, or choose a popular place.</Muted> : null}
+        {search.data && search.data.length > 0 ? (
+          <View accessibilityLabel="Search results" style={{ borderWidth: 1, borderColor: t.line, borderRadius: 10, overflow: "hidden" }}>
+            {search.data.map((p, i) => (
+              <Pressable key={`${p.lat},${p.lon},${i}`} accessibilityRole="button" accessibilityLabel={`${p.name}, ${p.address}`} onPress={() => { setDest(p); search.reset(); }} style={{ minHeight: 44, paddingHorizontal: 12, paddingVertical: 8, borderTopWidth: i === 0 ? 0 : 1, borderColor: t.line }}>
+                <Text style={{ color: t.text, fontWeight: "600" }}>{p.name}</Text>
+                <Text numberOfLines={1} style={{ color: t.muted, fontSize: 12 }}>{p.address}</Text>
+              </Pressable>
+            ))}
+          </View>
+        ) : null}
+        <Muted>{`Going to: ${dest.name}`}</Muted>
+        <Muted>Popular places:</Muted>
         <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
           {PLACES.map((p) => (
-            <Choice key={p.id} role="radio" label={p.name} selected={dropId === p.id} onPress={() => setDropId(p.id)} />
+            <Choice key={p.id} role="radio" label={p.name} selected={dest.lat === p.lat && dest.lon === p.lon} onPress={() => setDest(p)} />
           ))}
         </View>
 

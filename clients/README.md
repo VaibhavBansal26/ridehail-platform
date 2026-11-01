@@ -17,7 +17,7 @@ npm run typecheck && npm test                                   # package, rider
 RIDEHAIL_E2E_URL=http://localhost:8080 npm test --workspace @ridehail/api   # with the API running: a whole ride
 ```
 
-## Maps and live tracking (the web apps)
+## Maps and live tracking
 
 `rider-web` and `customer-web` draw maps with Leaflet (`components/ride-map.tsx`, loaded in the browser only). The customer's trip screen shows the
 pickup and destination pins and the driver's vehicle moving: the server pushes the driver's position (`RIDER_LOCATION`, every few seconds), the app keeps
@@ -28,9 +28,13 @@ are SVG drawn in code (`components/vehicle-art.tsx`) from presentation attribute
 - **Tiles:** `MAP_TILE_URL` (default OpenStreetMap's public server, `https://tile.openstreetmap.org/{z}/{x}/{y}.png`) and `MAP_TILE_ATTRIBUTION`, read from the
   server's environment on every request, so one build serves every deployment. `proxy.ts` allows exactly that tile host in `img-src`. OSM's public server is
   for light use only: use your own tile provider in production.
-- **The route is a straight line** between pickup and destination, and destinations are a fixed list; real routing and address search need a provider
-  (a key, a bill and a privacy decision) that is not chosen here.
-- **The phone apps have no maps yet.** They would need a native map library and its keys.
+- **The road and the search come from the API** ([../docs/GEO.md](../docs/GEO.md)): `api.routes.between()` draws the road between two points, and the customer's
+  booking screen has a search box (`api.places.search()`, run when the person asks, never on every keystroke) next to the popular places. If either service is
+  down the map draws a straight dashed line and the screen offers the popular places.
+- **The phone apps' maps** are a small Leaflet page in a WebView (`components/ride-map.tsx`, the page itself is `mapPageHtml()` in `@ridehail/api`), so they need no
+  native map library and no Google or Apple map key, and draw the same pictures as the web. The page loads Leaflet from a CDN with an integrity hash, so they need
+  the network (as their tiles do). `EXPO_PUBLIC_MAP_TILE_URL` (set at build time) changes the tile server. The page was checked in a real browser; the WebView
+  around it has been bundled and unit-tested but not run on a device.
 
 ## The shared package
 

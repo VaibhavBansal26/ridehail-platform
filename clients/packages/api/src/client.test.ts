@@ -304,3 +304,34 @@ describe("saveSession", () => {
     expect(await store.load()).toEqual({ accessToken: "a", refreshToken: "r" });
   });
 });
+
+describe("address search and routes", () => {
+  it("encodes what the person typed and says where they are", async () => {
+    const { api, calls } = setup(() => json([{ name: "Cubbon Park", address: "Cubbon Park, Bengaluru", lat: 12.97, lon: 77.59 }]));
+    const places = await api.places.search("Cubbon & Park #1", { lat: 12.9716, lon: 77.5946 });
+    expect(places[0]!.name).toBe("Cubbon Park");
+    expect(calls[0]!.url).toBe(`${BASE}/api/places/search?q=Cubbon%20%26%20Park%20%231&lat=12.9716&lon=77.5946`);
+  });
+
+  it("searches without a position too", async () => {
+    const { api, calls } = setup(() => json([]));
+    expect(await api.places.search("airport")).toEqual([]);
+    expect(calls[0]!.url).toBe(`${BASE}/api/places/search?q=airport`);
+  });
+
+  it("asks for the road between two points and checks what comes back", async () => {
+    const route = { distanceKm: 6.6, durationMin: 18.5, points: [[12.97, 77.59], [12.98, 77.64]] };
+    const { api, calls } = setup(() => json(route));
+    expect((await api.routes.between({ lat: 12.97, lon: 77.59 }, { lat: 12.98, lon: 77.64 })).points).toHaveLength(2);
+    expect(calls[0]!.url).toBe(`${BASE}/api/routes?fromLat=12.97&fromLon=77.59&toLat=12.98&toLon=77.64`);
+  });
+
+  it("refuses a route with no line in it, and reports a service that is down as an error to fall back from", async () => {
+    const bad = setup(() => json({ distanceKm: 1, durationMin: 1, points: [[1, 2]] }));
+    expect(await bad.api.routes.between({ lat: 1, lon: 2 }, { lat: 3, lon: 4 }).catch((e) => e)).toBeInstanceOf(ContractError);
+    const down = setup(() => json({ detail: "Routing is not available right now" }, 502));
+    const err = await down.api.routes.between({ lat: 1, lon: 2 }, { lat: 3, lon: 4 }).catch((e) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect(err.status).toBe(502);
+  });
+});

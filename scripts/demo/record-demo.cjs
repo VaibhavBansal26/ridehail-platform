@@ -18,6 +18,7 @@ const ADMIN = process.env.ADMIN_URL || 'http://localhost:3000';
 const API = process.env.API_URL || 'http://localhost:8080';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'dev-admin-password';
 const PASSWORD = 'demo-password-1';
+const DESTINATION = process.env.DESTINATION || 'Lalbagh'; // searched for by name in the customer app
 
 const { lines } = require('./narration.json');
 const LINE = Object.fromEntries(lines.map((l) => [l.id, l]));
@@ -35,6 +36,20 @@ const MG_ROAD = { lat: 12.9756, lon: 77.6068 };        // the nearest drop-off i
 const lerp = (a, b, t) => ({ lat: a.lat + (b.lat - a.lat) * t, lon: a.lon + (b.lon - a.lon) * t });
 const geo = (p) => ({ latitude: p.lat, longitude: p.lon });
 const leg = (a, b, steps) => Array.from({ length: steps }, (_, i) => lerp(a, b, (i + 1) / steps));
+/** `n` points spaced evenly along a road (a list of {lat, lon}), the last being its end: where a car would be at each step. */
+function along(road, n) {
+  const d = (p, q) => Math.hypot(p.lat - q.lat, (p.lon - q.lon) * Math.cos((p.lat * Math.PI) / 180));
+  const cumulative = [0];
+  for (let i = 1; i < road.length; i++) cumulative.push(cumulative[i - 1] + d(road[i - 1], road[i]));
+  const total = cumulative[cumulative.length - 1];
+  return Array.from({ length: n }, (_, k) => {
+    const target = (total * (k + 1)) / n;
+    let j = 1;
+    while (j < cumulative.length - 1 && cumulative[j] < target) j++;
+    const span = cumulative[j] - cumulative[j - 1] || 1;
+    return lerp(road[j - 1], road[j], Math.min(1, Math.max(0, (target - cumulative[j - 1]) / span)));
+  });
+}
 
 // ---------------------------------------------------------------------------------------------------------------- overlays
 // Drawn inside the page so they are part of the recording (contexts use bypassCSP: the apps' policy forbids inline styles).
@@ -176,13 +191,26 @@ async function rideScene(browser, people) {
   await c.getByRole('link', { name: 'Ride' }).click();
   await c.getByRole('button', { name: 'Use my location' }).click({ timeout: 20000 });
   await scene.beat('fare', async () => {
-    await say(c, 'Pickup and destination on the map, fare quoted upfront');
-    await sleep(900);
-    await c.getByRole('combobox', { name: 'Drop-off' }).selectOption('MG Road');
-    await sleep(1200);
+    await say(c, 'Search for a place: the map shows the road to it');
+    await typeInto(c.getByRole('searchbox'), DESTINATION);
+    await c.getByRole('button', { name: 'Search' }).click();
+    await c.getByRole('list', { name: 'Search results' }).getByRole('button').first().click({ timeout: 30000 });
+    await sleep(2500); // the road arrives from the routing service
+    await say(c, 'Fare quoted upfront, locked when you book');
     await c.getByRole('button', { name: 'See fare' }).click();
     await c.getByRole('button', { name: 'Request ride' }).waitFor({ timeout: 30000 });
   });
+  // the road the car will drive: the same one the map draws (the first search result is the destination the customer chose)
+  const customerToken = (await call('POST', '/api/auth/login', null, { phone: people.customer.phone, password: PASSWORD })).accessToken;
+  const destination = (await call('GET', '/api/places/search?q=' + encodeURIComponent(DESTINATION), customerToken))[0];
+  const roadBetween = async (from, to, steps) => {
+    try {
+      const r = await call('GET', `/api/routes?fromLat=${from.lat}&fromLon=${from.lon}&toLat=${to.lat}&toLon=${to.lon}`, customerToken);
+      return along(r.points.map(([lat, lon]) => ({ lat, lon })), steps);
+    } catch {
+      return leg(from, to, steps); // no routing service: a straight line
+    }
+  };
   // the demo city has trips of its own: remember this fare so the driver takes THIS customer's trip
   const fare = ((await c.locator('main').innerText()).split('Your fare')[1] || '').match(/\$\d+\.\d{2}/)[0];
 
@@ -209,7 +237,7 @@ async function rideScene(browser, people) {
   await scene.beat('approach', async () => {
     await say(c, 'Live: the car is on its way to you');
     await say(r, 'Head to the pickup');
-    await drive(leg(START, PICKUP, 4));
+    await drive(await roadBetween(START, PICKUP, 5));
   });
 
   await scene.beat('drive', async () => {
@@ -219,7 +247,7 @@ async function rideScene(browser, people) {
     await r.getByRole('button', { name: 'Start trip' }).click();
     await say(c, 'On your way');
     await say(r, 'Drive to the drop-off');
-    await drive(leg(PICKUP, MG_ROAD, 4));
+    await drive(await roadBetween(PICKUP, destination, 8));
     await r.getByRole('button', { name: 'Complete trip' }).click();
   });
 
@@ -266,6 +294,9 @@ async function rushScene(browser, people) {
   const [r, a] = await Promise.all([rctx.newPage(), actx.newPage()]);
   await Promise.all([prepare(r, 'DRIVER'), prepare(a, 'OPERATIONS')]);
   await Promise.all([r.goto(RIDER + '/'), a.goto(ADMIN + '/map', { waitUntil: 'domcontentloaded' })]);
+  // the server sets a driver who has stopped reporting offline, which is what happens between scenes when one is re-recorded on its own
+  const goOnline = r.getByRole('button', { name: 'Go online' });
+  if (await goOnline.waitFor({ timeout: 6000 }).then(() => true, () => false)) await goOnline.click();
   await r.getByRole('button', { name: 'Go offline' }).waitFor({ timeout: 30000 });
   await sleep(1200);
 

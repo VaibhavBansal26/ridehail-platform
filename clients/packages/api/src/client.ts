@@ -10,7 +10,9 @@ import {
   Offer,
   Payout,
   PayoutOnboarding,
+  Place,
   Quote,
+  RoadRoute,
   Rider,
   RiderLocation,
   Trip,
@@ -102,6 +104,18 @@ export function createApi(opts: ApiOptions) {
       registerRider: (b: { name: string; phone: string; password: string; vehicleType: VehicleType }) =>
         post("/api/auth/register/rider", AuthResult, b, true),
       login: (b: { phone: string; password: string }) => post("/api/auth/login", AuthResult, b, true),
+    },
+
+    places: {
+      /** Search for an address or place by name (3 to 200 characters). `near` favours results around it. 502 if the search service is down: offer a fallback. */
+      search: (q: string, near?: { lat: number; lon: number }) =>
+        get(`/api/places/search?q=${encodeURIComponent(q)}${near ? `&lat=${near.lat}&lon=${near.lon}` : ""}`, z.array(Place)),
+    },
+
+    routes: {
+      /** The road from one point to another, thinned for drawing. 502 if the routing service is down: draw a straight line instead. */
+      between: (from: { lat: number; lon: number }, to: { lat: number; lon: number }) =>
+        get(`/api/routes?fromLat=${from.lat}&fromLon=${from.lon}&toLat=${to.lat}&toLon=${to.lon}`, RoadRoute),
     },
 
     fares: {

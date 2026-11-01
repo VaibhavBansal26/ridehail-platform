@@ -119,6 +119,26 @@ ridehail:
   ratelimit:
     store: memory        # memory | redis. Use redis whenever more than one instance runs.
     redis-cool-off: 5s   # after a Redis failure, use local counters for this long before trying Redis again
+  geo:   # address search and road routes, through the server (see docs/GEO.md)
+    provider: ${GEO_PROVIDER:osm}                                          # osm = Nominatim-compatible search + OSRM-compatible routing; fake = no network
+    search-url: ${GEO_SEARCH_URL:https://nominatim.openstreetmap.org}      # the PUBLIC servers: light use only. Use your own or a paid one for real traffic
+    routing-url: ${GEO_ROUTING_URL:https://router.project-osrm.org}
+    user-agent: ${GEO_USER_AGENT:ridehail-platform (set GEO_USER_AGENT to your application name and a contact address)}
+    api-key: ${GEO_API_KEY:}                                               # for a paid provider; sent as ?key=, never logged
+    timeout: 4s
+    search-cache-ttl: 24h
+    route-cache-ttl: 1h
+    cache-size: 2000
+    max-route-points: 250
+    searches-per-second: 1.0     # per person
+    search-burst: 5
+    routes-per-second: 2.0
+    route-burst: 10
+    provider-searches-per-second: 1.0   # everyone together, towards the provider (the public Nominatim allows 1 a second)
+    provider-search-burst: 2
+    provider-routes-per-second: 5.0
+    provider-route-burst: 10
+    fares-use-roads: ${GEO_FARES_USE_ROADS:false}   # quote fares from the road distance and time (falls back to the straight-line factor if the provider is down)
   tracking:
     location-updates-per-second: 1.0   # sustained rate a rider app may report its position
     location-burst: 5                  # short bursts allowed above that
