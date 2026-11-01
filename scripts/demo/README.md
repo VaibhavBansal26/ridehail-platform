@@ -59,8 +59,7 @@ voice you use; `assemble.cjs` places each line where its scene started.
   are shown without it.
 - Re-run the **whole** `build-demo.sh` after changing the voice or the words: the recording is paced to the audio, so a new voice needs
   a new recording. `assemble.cjs` warns if a line would run into the next one.
-- The narration step has been run with the system voice only. It has not been run against ElevenLabs from this repository, so the first run
-  with your key is its first real test: if the request fails it prints ElevenLabs' answer (status and reason) and stops.
+- The committed video was made with an ElevenLabs voice. If a request fails, the script prints ElevenLabs' answer (status and reason) and stops. A restricted key needs the text-to-speech permission; it does not need `voices_read` when you give `ELEVENLABS_VOICE_ID`.
 
 ## How it works, and what to know when it breaks
 

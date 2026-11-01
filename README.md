@@ -4,7 +4,7 @@ A ride-sharing platform: a Spring Boot 3 (Java 21) API, an admin panel for opera
 
 [![Watch the demo](docs/demo/ridehail-demo.gif)](docs/demo/ridehail-demo.mp4)
 
-*The demo (under 3 minutes, with narration, [mp4](docs/demo/ridehail-demo.mp4)): a customer and a driver take a ride on live maps with the car moving, three requests arrive at the same moment, and the admin panel is toured. It is the real UI against the real API, recorded by [`scripts/demo`](scripts/demo) with simulated payments. The voice in the committed video is a system stand-in; [`scripts/demo`](scripts/demo/README.md) explains how to rebuild it with an ElevenLabs voice.*
+*The demo (about 3 minutes, narrated with an ElevenLabs voice, [mp4](docs/demo/ridehail-demo.mp4)): a customer and a driver take a ride on live maps with the car moving, three requests arrive at the same moment, and the admin panel is toured. It is the real UI against the real API, recorded by [`scripts/demo`](scripts/demo) with simulated payments. [`scripts/demo`](scripts/demo/README.md) explains how to rebuild it, with your own voice if you like.*
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/VaibhavBansal26/ridehail-platform)
 
